@@ -20,16 +20,17 @@ class WorldState {
   /**
    * Add a player to the world
    */
-  addPlayer(socketId, name) {
-    const character = CHARACTERS[this.characterIndex % CHARACTERS.length];
-    this.characterIndex++;
+  addPlayer(socketId, name, character = '🤡', isVIP = false) {
+    // Limit name to 8 characters
+    const safeName = (name || `Player${this.players.size + 1}`).slice(0, 8);
 
     const player = {
       id: socketId,
-      name: name || `Player${this.players.size + 1}`,
+      name: safeName,
       x: SPAWN_POINT.x + (Math.random() - 0.5) * 50,
       y: SPAWN_POINT.y + (Math.random() - 0.5) * 50,
-      character,
+      character: character || '🤡',
+      isVIP: isVIP || false,
     };
 
     this.players.set(socketId, player);

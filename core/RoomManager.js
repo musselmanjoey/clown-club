@@ -54,7 +54,7 @@ class RoomManager {
   /**
    * Join an existing room (auto-creates LOBBY if needed)
    */
-  joinRoom(socket, { roomCode, playerName }) {
+  joinRoom(socket, { roomCode, playerName, character, isVIP }) {
     const code = roomCode.toUpperCase();
     let worldState = this.rooms.get(code);
 
@@ -76,8 +76,8 @@ class RoomManager {
       this.leaveRoom(socket);
     }
 
-    // Add player to world
-    const player = worldState.addPlayer(socket.id, playerName);
+    // Add player to world with character and VIP status
+    const player = worldState.addPlayer(socket.id, playerName, character, isVIP);
 
     // Track player's room
     this.playerRooms.set(socket.id, code);
@@ -92,6 +92,7 @@ class RoomManager {
       x: player.x,
       y: player.y,
       character: player.character,
+      isVIP: player.isVIP,
     });
 
     // Send state to joining player
