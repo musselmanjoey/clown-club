@@ -1,0 +1,71 @@
+{
+  "zones": {
+    "lobby": {
+      "name": "Town Square",
+      "bounds": {
+        "width": 800,
+        "height": 600
+      },
+      "spawnPoint": {
+        "x": 400,
+        "y": 300
+      },
+      "objects": [
+        {
+          "id": "door-1",
+          "type": "door",
+          "x": 700,
+          "y": 300,
+          "emoji": "🚪",
+          "label": "Exit",
+          "action": "zone-change",
+          "targetZone": "arcade"
+        },
+        {
+          "id": "arcade-1",
+          "type": "arcade",
+          "x": 200,
+          "y": 150,
+          "emoji": "🕹️",
+          "label": "Arcade",
+          "action": "launch-game"
+        },
+        {
+          "id": "tree-1",
+          "type": "decoration",
+          "x": 100,
+          "y": 400,
+          "emoji": "🌲"
+        },
+        {
+          "id": "tree-2",
+          "type": "decoration",
+          "x": 600,
+          "y": 450,
+          "emoji": "🌲"
+        },
+        {
+          "id": "snowman-1",
+          "type": "decoration",
+          "x": 350,
+          "y": 200,
+          "emoji": "⛄"
+        }
+      ]
+    }
+  },
+  "characters": {
+    "penguin": { "emoji": "🐧", "name": "Penguin" },
+    "bear": { "emoji": "🐻", "name": "Bear" },
+    "fox": { "emoji": "🦊", "name": "Fox" },
+    "cat": { "emoji": "🐱", "name": "Cat" },
+    "dog": { "emoji": "🐶", "name": "Dog" },
+    "rabbit": { "emoji": "🐰", "name": "Rabbit" }
+  },
+  "emotes": {
+    "wave": { "emoji": "👋", "duration": 2000 },
+    "dance": { "emoji": "💃", "duration": 3000 },
+    "laugh": { "emoji": "😂", "duration": 1500 },
+    "heart": { "emoji": "❤️", "duration": 2000 }
+  }
+}
