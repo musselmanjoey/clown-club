@@ -1,0 +1,17 @@
+{
+  "totalSpaces": 50,
+  "winSpace": 50,
+  "ladders": [
+    { "start": 4, "end": 14, "name": "Quick Climb" },
+    { "start": 9, "end": 22, "name": "Lucky Ladder" },
+    { "start": 18, "end": 31, "name": "Big Leap" },
+    { "start": 28, "end": 42, "name": "Super Boost" },
+    { "start": 32, "end": 44, "name": "Final Push" }
+  ],
+  "chutes": [
+    { "start": 16, "end": 6, "name": "Slippery Slide" },
+    { "start": 34, "end": 24, "name": "Big Drop" },
+    { "start": 49, "end": 39, "name": "So Close!" }
+  ],
+  "specialSpaces": []
+}

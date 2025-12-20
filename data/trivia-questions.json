@@ -1,0 +1,364 @@
+{
+  "questions": [
+    {
+      "id": "gen_1",
+      "question": "What year was the first iPhone released?",
+      "options": [
+        { "id": "a", "text": "2005" },
+        { "id": "b", "text": "2007" },
+        { "id": "c", "text": "2009" },
+        { "id": "d", "text": "2006" }
+      ],
+      "correctAnswerId": "b",
+      "category": "technology"
+    },
+    {
+      "id": "gen_2",
+      "question": "Which planet is known as the Red Planet?",
+      "options": [
+        { "id": "a", "text": "Venus" },
+        { "id": "b", "text": "Jupiter" },
+        { "id": "c", "text": "Mars" },
+        { "id": "d", "text": "Saturn" }
+      ],
+      "correctAnswerId": "c",
+      "category": "science"
+    },
+    {
+      "id": "gen_3",
+      "question": "What is the capital of Australia?",
+      "options": [
+        { "id": "a", "text": "Sydney" },
+        { "id": "b", "text": "Melbourne" },
+        { "id": "c", "text": "Canberra" },
+        { "id": "d", "text": "Brisbane" }
+      ],
+      "correctAnswerId": "c",
+      "category": "geography"
+    },
+    {
+      "id": "gen_4",
+      "question": "Who painted the Mona Lisa?",
+      "options": [
+        { "id": "a", "text": "Vincent van Gogh" },
+        { "id": "b", "text": "Leonardo da Vinci" },
+        { "id": "c", "text": "Pablo Picasso" },
+        { "id": "d", "text": "Michelangelo" }
+      ],
+      "correctAnswerId": "b",
+      "category": "art"
+    },
+    {
+      "id": "gen_5",
+      "question": "What is the largest mammal in the world?",
+      "options": [
+        { "id": "a", "text": "African Elephant" },
+        { "id": "b", "text": "Blue Whale" },
+        { "id": "c", "text": "Giraffe" },
+        { "id": "d", "text": "Polar Bear" }
+      ],
+      "correctAnswerId": "b",
+      "category": "animals"
+    },
+    {
+      "id": "gen_6",
+      "question": "In what year did World War II end?",
+      "options": [
+        { "id": "a", "text": "1943" },
+        { "id": "b", "text": "1944" },
+        { "id": "c", "text": "1945" },
+        { "id": "d", "text": "1946" }
+      ],
+      "correctAnswerId": "c",
+      "category": "history"
+    },
+    {
+      "id": "gen_7",
+      "question": "What is the chemical symbol for gold?",
+      "options": [
+        { "id": "a", "text": "Go" },
+        { "id": "b", "text": "Gd" },
+        { "id": "c", "text": "Au" },
+        { "id": "d", "text": "Ag" }
+      ],
+      "correctAnswerId": "c",
+      "category": "science"
+    },
+    {
+      "id": "gen_8",
+      "question": "Which movie won the first Academy Award for Best Picture?",
+      "options": [
+        { "id": "a", "text": "The Jazz Singer" },
+        { "id": "b", "text": "Wings" },
+        { "id": "c", "text": "Sunrise" },
+        { "id": "d", "text": "The Broadway Melody" }
+      ],
+      "correctAnswerId": "b",
+      "category": "movies"
+    },
+    {
+      "id": "gen_9",
+      "question": "How many strings does a standard guitar have?",
+      "options": [
+        { "id": "a", "text": "4" },
+        { "id": "b", "text": "5" },
+        { "id": "c", "text": "6" },
+        { "id": "d", "text": "8" }
+      ],
+      "correctAnswerId": "c",
+      "category": "music"
+    },
+    {
+      "id": "gen_10",
+      "question": "What is the smallest country in the world?",
+      "options": [
+        { "id": "a", "text": "Monaco" },
+        { "id": "b", "text": "Vatican City" },
+        { "id": "c", "text": "San Marino" },
+        { "id": "d", "text": "Liechtenstein" }
+      ],
+      "correctAnswerId": "b",
+      "category": "geography"
+    },
+    {
+      "id": "gen_11",
+      "question": "Who wrote 'Romeo and Juliet'?",
+      "options": [
+        { "id": "a", "text": "Charles Dickens" },
+        { "id": "b", "text": "Jane Austen" },
+        { "id": "c", "text": "William Shakespeare" },
+        { "id": "d", "text": "Mark Twain" }
+      ],
+      "correctAnswerId": "c",
+      "category": "literature"
+    },
+    {
+      "id": "gen_12",
+      "question": "What is the hardest natural substance on Earth?",
+      "options": [
+        { "id": "a", "text": "Gold" },
+        { "id": "b", "text": "Iron" },
+        { "id": "c", "text": "Diamond" },
+        { "id": "d", "text": "Titanium" }
+      ],
+      "correctAnswerId": "c",
+      "category": "science"
+    },
+    {
+      "id": "gen_13",
+      "question": "Which planet has the most moons?",
+      "options": [
+        { "id": "a", "text": "Jupiter" },
+        { "id": "b", "text": "Saturn" },
+        { "id": "c", "text": "Uranus" },
+        { "id": "d", "text": "Neptune" }
+      ],
+      "correctAnswerId": "b",
+      "category": "science"
+    },
+    {
+      "id": "gen_14",
+      "question": "What year did the Titanic sink?",
+      "options": [
+        { "id": "a", "text": "1910" },
+        { "id": "b", "text": "1912" },
+        { "id": "c", "text": "1914" },
+        { "id": "d", "text": "1908" }
+      ],
+      "correctAnswerId": "b",
+      "category": "history"
+    },
+    {
+      "id": "gen_15",
+      "question": "What is the main ingredient in guacamole?",
+      "options": [
+        { "id": "a", "text": "Tomato" },
+        { "id": "b", "text": "Avocado" },
+        { "id": "c", "text": "Lime" },
+        { "id": "d", "text": "Onion" }
+      ],
+      "correctAnswerId": "b",
+      "category": "food"
+    },
+    {
+      "id": "gen_16",
+      "question": "Which element has the atomic number 1?",
+      "options": [
+        { "id": "a", "text": "Helium" },
+        { "id": "b", "text": "Oxygen" },
+        { "id": "c", "text": "Hydrogen" },
+        { "id": "d", "text": "Carbon" }
+      ],
+      "correctAnswerId": "c",
+      "category": "science"
+    },
+    {
+      "id": "gen_17",
+      "question": "What is the tallest mountain in the world?",
+      "options": [
+        { "id": "a", "text": "K2" },
+        { "id": "b", "text": "Mount Everest" },
+        { "id": "c", "text": "Kangchenjunga" },
+        { "id": "d", "text": "Makalu" }
+      ],
+      "correctAnswerId": "b",
+      "category": "geography"
+    },
+    {
+      "id": "gen_18",
+      "question": "Who was the first person to walk on the moon?",
+      "options": [
+        { "id": "a", "text": "Buzz Aldrin" },
+        { "id": "b", "text": "Neil Armstrong" },
+        { "id": "c", "text": "Michael Collins" },
+        { "id": "d", "text": "John Glenn" }
+      ],
+      "correctAnswerId": "b",
+      "category": "history"
+    },
+    {
+      "id": "gen_19",
+      "question": "What is the largest organ in the human body?",
+      "options": [
+        { "id": "a", "text": "Heart" },
+        { "id": "b", "text": "Liver" },
+        { "id": "c", "text": "Skin" },
+        { "id": "d", "text": "Lungs" }
+      ],
+      "correctAnswerId": "c",
+      "category": "science"
+    },
+    {
+      "id": "gen_20",
+      "question": "Which company created the PlayStation?",
+      "options": [
+        { "id": "a", "text": "Nintendo" },
+        { "id": "b", "text": "Microsoft" },
+        { "id": "c", "text": "Sony" },
+        { "id": "d", "text": "Sega" }
+      ],
+      "correctAnswerId": "c",
+      "category": "gaming"
+    },
+    {
+      "id": "gen_21",
+      "question": "How many bones are in the adult human body?",
+      "options": [
+        { "id": "a", "text": "186" },
+        { "id": "b", "text": "206" },
+        { "id": "c", "text": "226" },
+        { "id": "d", "text": "256" }
+      ],
+      "correctAnswerId": "b",
+      "category": "science"
+    },
+    {
+      "id": "gen_22",
+      "question": "What is the currency of Japan?",
+      "options": [
+        { "id": "a", "text": "Yuan" },
+        { "id": "b", "text": "Won" },
+        { "id": "c", "text": "Yen" },
+        { "id": "d", "text": "Ringgit" }
+      ],
+      "correctAnswerId": "c",
+      "category": "geography"
+    },
+    {
+      "id": "gen_23",
+      "question": "Which animal is known as the 'King of the Jungle'?",
+      "options": [
+        { "id": "a", "text": "Tiger" },
+        { "id": "b", "text": "Elephant" },
+        { "id": "c", "text": "Lion" },
+        { "id": "d", "text": "Gorilla" }
+      ],
+      "correctAnswerId": "c",
+      "category": "animals"
+    },
+    {
+      "id": "gen_24",
+      "question": "What is the speed of light (approximately)?",
+      "options": [
+        { "id": "a", "text": "186,000 miles per second" },
+        { "id": "b", "text": "286,000 miles per second" },
+        { "id": "c", "text": "386,000 miles per second" },
+        { "id": "d", "text": "86,000 miles per second" }
+      ],
+      "correctAnswerId": "a",
+      "category": "science"
+    },
+    {
+      "id": "gen_25",
+      "question": "Who invented the telephone?",
+      "options": [
+        { "id": "a", "text": "Thomas Edison" },
+        { "id": "b", "text": "Alexander Graham Bell" },
+        { "id": "c", "text": "Nikola Tesla" },
+        { "id": "d", "text": "Guglielmo Marconi" }
+      ],
+      "correctAnswerId": "b",
+      "category": "history"
+    },
+    {
+      "id": "gen_26",
+      "question": "What is the longest river in the world?",
+      "options": [
+        { "id": "a", "text": "Amazon" },
+        { "id": "b", "text": "Nile" },
+        { "id": "c", "text": "Yangtze" },
+        { "id": "d", "text": "Mississippi" }
+      ],
+      "correctAnswerId": "b",
+      "category": "geography"
+    },
+    {
+      "id": "gen_27",
+      "question": "Which band performed 'Bohemian Rhapsody'?",
+      "options": [
+        { "id": "a", "text": "The Beatles" },
+        { "id": "b", "text": "Led Zeppelin" },
+        { "id": "c", "text": "Queen" },
+        { "id": "d", "text": "Pink Floyd" }
+      ],
+      "correctAnswerId": "c",
+      "category": "music"
+    },
+    {
+      "id": "gen_28",
+      "question": "What does 'HTTP' stand for?",
+      "options": [
+        { "id": "a", "text": "HyperText Transfer Protocol" },
+        { "id": "b", "text": "High Transfer Text Protocol" },
+        { "id": "c", "text": "HyperText Transit Protocol" },
+        { "id": "d", "text": "Hyper Transfer Text Program" }
+      ],
+      "correctAnswerId": "a",
+      "category": "technology"
+    },
+    {
+      "id": "gen_29",
+      "question": "How many continents are there?",
+      "options": [
+        { "id": "a", "text": "5" },
+        { "id": "b", "text": "6" },
+        { "id": "c", "text": "7" },
+        { "id": "d", "text": "8" }
+      ],
+      "correctAnswerId": "c",
+      "category": "geography"
+    },
+    {
+      "id": "gen_30",
+      "question": "What is the national animal of Canada?",
+      "options": [
+        { "id": "a", "text": "Moose" },
+        { "id": "b", "text": "Beaver" },
+        { "id": "c", "text": "Polar Bear" },
+        { "id": "d", "text": "Grizzly Bear" }
+      ],
+      "correctAnswerId": "b",
+      "category": "geography"
+    }
+  ]
+}
