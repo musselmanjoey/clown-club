@@ -286,13 +286,13 @@ class BoardGame extends BaseGame {
     this.broadcast('bg:trivia-question', {
       question: this.currentQuestion.question,
       options: this.currentQuestion.options,
-      timeLimit: 15
+      timeLimit: 30
     });
 
     // Auto-advance after timeout
     this.triviaTimeout = setTimeout(() => {
       this.endTrivia();
-    }, 15000);
+    }, 30000);
   }
 
   /**
