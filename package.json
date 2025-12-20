@@ -1,14 +1,23 @@
 {
-  "name": "clown-club",
+  "name": "clown-club-server",
   "version": "1.0.0",
-  "private": true,
-  "workspaces": [
-    "server"
-  ],
+  "description": "Clown Club virtual world server (Club Penguin-style)",
+  "main": "server.js",
   "scripts": {
-    "dev": "npm run dev --workspace=server",
-    "build": "echo 'Server only - no build needed'",
-    "start": "npm run start --workspace=server"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "socket.io",
+    "websocket",
+    "virtual-world",
+    "multiplayer"
+  ],
+  "author": "Joey Musselman",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "socket.io": "^4.8.1"
   },
   "engines": {
     "node": ">=20.0.0"
