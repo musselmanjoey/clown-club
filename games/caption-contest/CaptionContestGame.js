@@ -1,110 +1,338 @@
 const BaseGame = require('../BaseGame');
 
 /**
- * CaptionContestGame - Players submit captions for images and vote on the best
- * Note: Uses 'cap:' prefix to avoid conflict with clown-club's 'cc:' prefix
+ * CaptionContestGame - Jackbox-style caption game with head-to-head voting
+ *
+ * Flow: intro → submitting → voting (per matchup) → matchup-result → round-summary
+ * Uses 'cap:' prefix for socket events
  */
 class CaptionContestGame extends BaseGame {
   static gameName = 'Caption Contest';
-  static description = 'Submit funny captions for images and vote for the best one!';
-  static minPlayers = 2;
+  static description = 'Submit funny captions and vote head-to-head!';
+  static minPlayers = 1;
   static maxPlayers = 12;
+
+  // Timer durations (ms)
+  static TIMERS = {
+    intro: 3000,
+    submitting: 45000,
+    voting: 12000,
+    matchupResult: 4000,
+    roundSummary: 5000,
+  };
 
   constructor(room, io) {
     super(room, io);
 
-    // Game-specific state
     this.currentRound = 0;
+    this.phase = 'waiting';
     this.submissions = [];
-    this.votes = new Map();
     this.scores = new Map();
     this.currentImage = null;
 
-    // Image management (shared across all games on this server instance)
+    // Timer state
+    this.timer = null;
+    this.timerEnd = null;
+    this.timerInterval = null;
+
+    // Matchup state
+    this.matchups = [];
+    this.currentMatchupIndex = 0;
+    this.matchupVotes = new Map();
+    this.roundScores = new Map(); // Track points earned this round
+
+    // Image management
     this.gameImages = CaptionContestGame.sharedImages;
 
-    // Initialize scores for all players
+    // Initialize scores
     for (const player of room.players) {
       this.scores.set(player.id, 0);
     }
   }
 
-  // Shared images storage (static so persists across game instances)
   static sharedImages = [];
 
-  /**
-   * Start the game
-   */
+  // ============ GAME FLOW ============
+
   start() {
     this.nextRound();
   }
 
-  /**
-   * Start a new round
-   */
   nextRound() {
     this.currentRound++;
     this.submissions = [];
-    this.votes = new Map();
-    this.currentImage = this.getRandomImage();
-    this.setState('submitting');
+    this.matchups = [];
+    this.currentMatchupIndex = 0;
+    this.roundScores = new Map();
 
-    this.log(`Round ${this.currentRound} started`);
-    this.broadcast('cap:game-state-changed', {
-      gameState: 'submitting',
-      currentImage: this.currentImage,
-      round: this.currentRound
+    // Initialize round scores for all players
+    for (const player of this.room.players) {
+      this.roundScores.set(player.id, 0);
+    }
+
+    this.currentImage = this.getRandomImage();
+    this.startPhase('intro');
+  }
+
+  startPhase(phase) {
+    this.clearTimer();
+    this.phase = phase;
+    this.setState(phase);
+
+    const duration = CaptionContestGame.TIMERS[phase];
+
+    this.log(`Phase: ${phase} (${duration}ms)`);
+
+    switch (phase) {
+      case 'intro':
+        this.broadcastPhase('intro', {
+          round: this.currentRound,
+          currentImage: this.currentImage,
+        });
+        this.startTimer(duration, () => this.startPhase('submitting'));
+        break;
+
+      case 'submitting':
+        this.broadcastPhase('submitting', {
+          round: this.currentRound,
+          currentImage: this.currentImage,
+          timer: Math.ceil(duration / 1000),
+        });
+        this.startTimer(duration, () => this.endSubmitting());
+        break;
+
+      case 'voting':
+        this.startCurrentMatchup();
+        break;
+
+      case 'matchup-result':
+        this.showMatchupResult();
+        break;
+
+      case 'round-summary':
+        this.showRoundSummary();
+        break;
+    }
+  }
+
+  // ============ SUBMITTING PHASE ============
+
+  endSubmitting() {
+    if (this.submissions.length === 0) {
+      // No submissions - skip to round summary
+      this.log('No submissions received');
+      this.startPhase('round-summary');
+      return;
+    }
+
+    if (this.submissions.length === 1) {
+      // Only one submission - give them a point and skip to summary
+      const sub = this.submissions[0];
+      this.awardPoints(sub.playerId, 1);
+      this.log('Single submission - awarding participation point');
+      this.startPhase('round-summary');
+      return;
+    }
+
+    // Generate matchups and start voting
+    this.generateMatchups();
+    this.startPhase('voting');
+  }
+
+  generateMatchups() {
+    // Shuffle submissions
+    const shuffled = [...this.submissions].sort(() => Math.random() - 0.5);
+
+    this.matchups = [];
+    for (let i = 0; i < shuffled.length; i += 2) {
+      if (i + 1 < shuffled.length) {
+        this.matchups.push({
+          captionA: shuffled[i],
+          captionB: shuffled[i + 1],
+          votesA: 0,
+          votesB: 0,
+        });
+      } else {
+        // Odd one out - gets a bye with 1 bonus point
+        this.awardPoints(shuffled[i].playerId, 1);
+        this.log(`${shuffled[i].playerName} gets a bye (+1 point)`);
+      }
+    }
+
+    this.currentMatchupIndex = 0;
+    this.log(`Generated ${this.matchups.length} matchups`);
+  }
+
+  // ============ VOTING PHASE ============
+
+  startCurrentMatchup() {
+    if (this.currentMatchupIndex >= this.matchups.length) {
+      // All matchups done
+      this.startPhase('round-summary');
+      return;
+    }
+
+    this.matchupVotes = new Map();
+    const matchup = this.matchups[this.currentMatchupIndex];
+    const duration = CaptionContestGame.TIMERS.voting;
+
+    this.broadcastPhase('voting', {
+      matchupIndex: this.currentMatchupIndex + 1,
+      matchupTotal: this.matchups.length,
+      captionA: matchup.captionA.caption,
+      captionB: matchup.captionB.caption,
+      idA: matchup.captionA.playerId,
+      idB: matchup.captionB.playerId,
+      timer: Math.ceil(duration / 1000),
+    });
+
+    this.startTimer(duration, () => this.endCurrentMatchup());
+  }
+
+  endCurrentMatchup() {
+    const matchup = this.matchups[this.currentMatchupIndex];
+
+    // Tally votes
+    matchup.votesA = 0;
+    matchup.votesB = 0;
+
+    for (const [voterId, votedForId] of this.matchupVotes.entries()) {
+      if (votedForId === matchup.captionA.playerId) {
+        matchup.votesA++;
+      } else if (votedForId === matchup.captionB.playerId) {
+        matchup.votesB++;
+      }
+    }
+
+    // Award points based on votes received
+    this.awardPoints(matchup.captionA.playerId, matchup.votesA);
+    this.awardPoints(matchup.captionB.playerId, matchup.votesB);
+
+    this.startPhase('matchup-result');
+  }
+
+  showMatchupResult() {
+    const matchup = this.matchups[this.currentMatchupIndex];
+    const duration = CaptionContestGame.TIMERS.matchupResult;
+
+    // Determine winner
+    let winnerName = null;
+    if (matchup.votesA > matchup.votesB) {
+      winnerName = matchup.captionA.playerName;
+    } else if (matchup.votesB > matchup.votesA) {
+      winnerName = matchup.captionB.playerName;
+    } else {
+      winnerName = 'TIE!';
+    }
+
+    this.broadcastPhase('matchup-result', {
+      matchupIndex: this.currentMatchupIndex + 1,
+      matchupTotal: this.matchups.length,
+      captionA: {
+        text: matchup.captionA.caption,
+        playerName: matchup.captionA.playerName,
+        playerId: matchup.captionA.playerId,
+      },
+      captionB: {
+        text: matchup.captionB.caption,
+        playerName: matchup.captionB.playerName,
+        playerId: matchup.captionB.playerId,
+      },
+      votesA: matchup.votesA,
+      votesB: matchup.votesB,
+      winnerName,
+    });
+
+    this.startTimer(duration, () => {
+      this.currentMatchupIndex++;
+      if (this.currentMatchupIndex < this.matchups.length) {
+        this.startPhase('voting');
+      } else {
+        this.startPhase('round-summary');
+      }
     });
   }
 
-  /**
-   * Get host state for TV display
-   */
-  getHostState() {
-    return {
-      state: this.state,
+  showRoundSummary() {
+    const duration = CaptionContestGame.TIMERS.roundSummary;
+
+    // Build scores with round changes
+    const scores = this.getScoreboard().map(s => ({
+      ...s,
+      roundScore: this.roundScores.get(
+        this.room.players.find(p => p.name === s.name)?.id
+      ) || 0,
+    }));
+
+    this.broadcastPhase('round-summary', {
       round: this.currentRound,
-      currentImage: this.currentImage,
-      submissions: this.state === 'voting' || this.state === 'results'
-        ? this.submissions.map(s => ({ caption: s.caption, playerId: s.playerId }))
-        : [],
-      submissionCount: this.submissions.length,
-      voteCount: this.votes.size,
-      playerCount: this.getPlayerCount(),
-      scores: this.getScoreboard()
-    };
+      scores,
+    });
+
+    // Don't auto-advance - wait for host to click next round
   }
 
-  /**
-   * Get player state for phone controller
-   */
-  getPlayerState(playerId) {
-    const hasSubmitted = this.submissions.some(s => s.playerId === playerId);
-    const hasVoted = this.votes.has(playerId);
+  // ============ HELPERS ============
 
-    return {
-      state: this.state,
-      round: this.currentRound,
-      currentImage: this.currentImage,
-      hasSubmitted,
-      hasVoted,
-      submissions: this.state === 'voting'
-        ? this.submissions.filter(s => s.playerId !== playerId).map(s => ({ caption: s.caption, playerId: s.playerId }))
-        : [],
-      myScore: this.scores.get(playerId) || 0
-    };
+  awardPoints(playerId, points) {
+    if (points <= 0) return;
+
+    const currentScore = this.scores.get(playerId) || 0;
+    this.scores.set(playerId, currentScore + points);
+
+    const currentRoundScore = this.roundScores.get(playerId) || 0;
+    this.roundScores.set(playerId, currentRoundScore + points);
+
+    this.log(`Awarded ${points} points to ${playerId}`);
   }
 
-  /**
-   * Handle game-specific events
-   */
+  broadcastPhase(phase, data) {
+    this.broadcast('cap:phase-changed', {
+      phase,
+      ...data,
+    });
+  }
+
+  startTimer(duration, onComplete) {
+    this.timerEnd = Date.now() + duration;
+
+    // Broadcast timer updates every second
+    this.timerInterval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((this.timerEnd - Date.now()) / 1000));
+      this.broadcast('cap:timer', { secondsLeft: remaining });
+
+      if (remaining <= 0) {
+        this.clearTimer();
+      }
+    }, 1000);
+
+    // Set the completion timer
+    this.timer = setTimeout(() => {
+      this.clearTimer();
+      onComplete();
+    }, duration);
+  }
+
+  clearTimer() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+  }
+
+  // ============ EVENT HANDLERS ============
+
   handleEvent(socket, event, data) {
     switch (event) {
       case 'cap:submit-caption':
         this.handleSubmitCaption(socket, data);
         break;
-      case 'cap:vote-caption':
-        this.handleVoteCaption(socket, data);
+      case 'cap:vote-matchup':
+        this.handleVoteMatchup(socket, data);
         break;
       case 'cap:next-round':
         this.handleNextRound(socket);
@@ -126,11 +354,8 @@ class CaptionContestGame extends BaseGame {
     }
   }
 
-  /**
-   * Handle caption submission
-   */
   handleSubmitCaption(socket, { caption }) {
-    if (this.state !== 'submitting') return;
+    if (this.phase !== 'submitting') return;
 
     const player = this.getPlayer(socket.id);
     if (!player) return;
@@ -141,7 +366,7 @@ class CaptionContestGame extends BaseGame {
     const submission = {
       playerId: socket.id,
       playerName: player.name,
-      caption: caption.trim()
+      caption: caption.trim(),
     };
     this.submissions.push(submission);
 
@@ -151,136 +376,142 @@ class CaptionContestGame extends BaseGame {
     this.broadcast('cap:submission-received', {
       playerName: player.name,
       totalSubmissions: this.submissions.length,
-      totalPlayers: this.getPlayerCount()
+      totalPlayers: this.getPlayerCount(),
     });
 
-    // If everyone submitted, move to voting
+    // If everyone submitted, advance early
     if (this.submissions.length === this.getPlayerCount()) {
-      this.startVoting();
+      this.clearTimer();
+      this.endSubmitting();
     }
   }
 
-  /**
-   * Start voting phase
-   */
-  startVoting() {
-    this.setState('voting');
-    this.votes = new Map();
+  handleVoteMatchup(socket, { votedForId }) {
+    if (this.phase !== 'voting') return;
 
-    this.log('All submissions in, voting started');
-    this.broadcast('cap:game-state-changed', {
-      gameState: 'voting',
-      submissions: this.submissions.map(s => ({
-        caption: s.caption,
-        playerId: s.playerId
-      }))
-    });
-  }
-
-  /**
-   * Handle vote
-   */
-  handleVoteCaption(socket, { votedForId }) {
-    if (this.state !== 'voting') return;
+    const matchup = this.matchups[this.currentMatchupIndex];
+    if (!matchup) return;
 
     // Can't vote for yourself
     if (votedForId === socket.id) {
-      socket.emit('error', { message: "Can't vote for yourself!" });
+      socket.emit('cap:error', { message: "Can't vote for yourself!" });
       return;
     }
 
-    // Check if already voted
-    if (this.votes.has(socket.id)) return;
+    // Must be one of the options
+    if (votedForId !== matchup.captionA.playerId && votedForId !== matchup.captionB.playerId) {
+      return;
+    }
 
-    this.votes.set(socket.id, votedForId);
-    this.log('Vote recorded');
+    // Check if already voted this matchup
+    if (this.matchupVotes.has(socket.id)) return;
 
-    // Notify vote count
-    this.broadcast('cap:vote-recorded', {
-      votesReceived: this.votes.size,
-      totalPlayers: this.getPlayerCount()
+    this.matchupVotes.set(socket.id, votedForId);
+    this.log(`Vote recorded from ${socket.id}`);
+
+    // Count current votes for live display
+    let votesA = 0, votesB = 0;
+    for (const [, vid] of this.matchupVotes.entries()) {
+      if (vid === matchup.captionA.playerId) votesA++;
+      else if (vid === matchup.captionB.playerId) votesB++;
+    }
+
+    this.broadcast('cap:vote-update', {
+      votesA,
+      votesB,
+      totalVotes: this.matchupVotes.size,
+      totalVoters: this.getEligibleVoterCount(matchup),
     });
 
-    // If everyone voted, show results
-    if (this.votes.size === this.getPlayerCount()) {
-      this.showResults();
+    // If everyone who can vote has voted, advance early
+    if (this.matchupVotes.size >= this.getEligibleVoterCount(matchup)) {
+      this.clearTimer();
+      this.endCurrentMatchup();
     }
   }
 
-  /**
-   * Calculate and show results
-   */
-  showResults() {
-    // Tally votes
-    const voteCounts = new Map();
-    for (const [voter, votedFor] of this.votes.entries()) {
-      voteCounts.set(votedFor, (voteCounts.get(votedFor) || 0) + 1);
-    }
-
-    // Update scores
-    for (const [playerId, voteCount] of voteCounts.entries()) {
-      const currentScore = this.scores.get(playerId) || 0;
-      this.scores.set(playerId, currentScore + voteCount);
-
-      // Update player score in players array
-      const player = this.getPlayer(playerId);
-      if (player) player.score = currentScore + voteCount;
-    }
-
-    // Find winner of this round
-    let maxVotes = 0;
-    let winnerId = null;
-    for (const [playerId, votes] of voteCounts.entries()) {
-      if (votes > maxVotes) {
-        maxVotes = votes;
-        winnerId = playerId;
-      }
-    }
-
-    const winner = this.getPlayer(winnerId);
-    const winningSubmission = this.submissions.find(s => s.playerId === winnerId);
-
-    this.setState('results');
-    this.log(`Round ${this.currentRound} winner: ${winner?.name}`);
-
-    this.broadcast('cap:game-state-changed', {
-      gameState: 'results',
-      winner: winner ? { id: winner.id, name: winner.name } : null,
-      winningCaption: winningSubmission?.caption,
-      allScores: this.getScoreboard(),
-      voteCounts: Array.from(voteCounts.entries()).map(([id, count]) => {
-        const player = this.getPlayer(id);
-        const submission = this.submissions.find(s => s.playerId === id);
-        return {
-          playerName: player?.name,
-          caption: submission?.caption,
-          votes: count
-        };
-      })
-    });
+  getEligibleVoterCount(matchup) {
+    // Everyone except the two people in the matchup
+    return Math.max(0, this.getPlayerCount() - 2);
   }
 
-  /**
-   * Handle next round request (host only)
-   */
   handleNextRound(socket) {
-    if (!this.isHost(socket.id)) return;
+    // Allow any player to advance for now (or restrict to host)
+    if (this.phase !== 'round-summary') return;
     this.nextRound();
   }
 
-  /**
-   * Get scoreboard sorted by score
-   */
+  // ============ STATE GETTERS ============
+
+  getHostState() {
+    const matchup = this.matchups[this.currentMatchupIndex];
+
+    return {
+      gameType: 'caption-contest',
+      phase: this.phase,
+      round: this.currentRound,
+      currentImage: this.currentImage,
+      timer: this.timerEnd ? Math.max(0, Math.ceil((this.timerEnd - Date.now()) / 1000)) : null,
+      submissions: this.submissions.map(s => ({
+        playerName: s.playerName,
+        playerId: s.playerId,
+      })),
+      submissionCount: this.submissions.length,
+      playerCount: this.getPlayerCount(),
+      scores: this.getScoreboard(),
+      matchup: matchup ? {
+        index: this.currentMatchupIndex + 1,
+        total: this.matchups.length,
+        captionA: { text: matchup.captionA.caption, playerName: matchup.captionA.playerName },
+        captionB: { text: matchup.captionB.caption, playerName: matchup.captionB.playerName },
+        votesA: matchup.votesA || 0,
+        votesB: matchup.votesB || 0,
+      } : null,
+    };
+  }
+
+  getPlayerState(playerId) {
+    const hasSubmitted = this.submissions.some(s => s.playerId === playerId);
+    const hasVoted = this.matchupVotes.has(playerId);
+    const matchup = this.matchups[this.currentMatchupIndex];
+
+    // Check if this player is IN the current matchup (can't vote)
+    const isInMatchup = matchup && (
+      matchup.captionA.playerId === playerId ||
+      matchup.captionB.playerId === playerId
+    );
+
+    return {
+      gameType: 'caption-contest',
+      phase: this.phase,
+      round: this.currentRound,
+      currentImage: this.currentImage,
+      timer: this.timerEnd ? Math.max(0, Math.ceil((this.timerEnd - Date.now()) / 1000)) : null,
+      hasSubmitted,
+      hasVoted,
+      isInMatchup,
+      myScore: this.scores.get(playerId) || 0,
+      matchup: matchup && !isInMatchup ? {
+        index: this.currentMatchupIndex + 1,
+        total: this.matchups.length,
+        captionA: matchup.captionA.caption,
+        captionB: matchup.captionB.caption,
+        idA: matchup.captionA.playerId,
+        idB: matchup.captionB.playerId,
+      } : null,
+    };
+  }
+
   getScoreboard() {
     return this.room.players
       .map(p => ({
         name: p.name,
-        score: this.scores.get(p.id) || 0
+        score: this.scores.get(p.id) || 0,
       }))
       .sort((a, b) => b.score - a.score);
   }
 
-  // ============ Image Management ============
+  // ============ IMAGE MANAGEMENT ============
 
   getRandomImage() {
     const activeImages = CaptionContestGame.sharedImages.filter(img => img.active);
@@ -295,20 +526,15 @@ class CaptionContestGame extends BaseGame {
     return `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  handleUploadImage(socket, { image, filename }) {
+  handleUploadImage(socket, { image }) {
     try {
-      if (!image) {
-        socket.emit('cap:image-uploaded', { success: false, message: 'No image data provided' });
+      if (!image || !image.startsWith('data:image/')) {
+        socket.emit('cap:image-uploaded', { success: false, message: 'Invalid image' });
         return;
       }
 
       if (image.length > 10e6) {
-        socket.emit('cap:image-uploaded', { success: false, message: 'Image too large (max 7MB)' });
-        return;
-      }
-
-      if (!image.startsWith('data:image/')) {
-        socket.emit('cap:image-uploaded', { success: false, message: 'Invalid image format' });
+        socket.emit('cap:image-uploaded', { success: false, message: 'Image too large' });
         return;
       }
 
@@ -316,16 +542,14 @@ class CaptionContestGame extends BaseGame {
         id: this.generateImageId(),
         url: image,
         active: true,
-        uploadedAt: Date.now()
+        uploadedAt: Date.now(),
       };
 
       CaptionContestGame.sharedImages.push(newImage);
-      this.log(`Image uploaded: ${newImage.id}`);
-
-      socket.emit('cap:image-uploaded', { success: true, message: 'Image uploaded!', image: newImage });
+      socket.emit('cap:image-uploaded', { success: true, image: newImage });
       this.io.emit('cap:images-list', CaptionContestGame.sharedImages);
     } catch (error) {
-      socket.emit('cap:image-uploaded', { success: false, message: `Upload failed: ${error.message}` });
+      socket.emit('cap:image-uploaded', { success: false, message: error.message });
     }
   }
 
@@ -333,7 +557,6 @@ class CaptionContestGame extends BaseGame {
     const image = CaptionContestGame.sharedImages.find(img => img.id === imageId);
     if (image) {
       image.active = !image.active;
-      this.log(`Image ${imageId} ${image.active ? 'activated' : 'deactivated'}`);
       this.io.emit('cap:images-list', CaptionContestGame.sharedImages);
     }
   }
@@ -342,27 +565,22 @@ class CaptionContestGame extends BaseGame {
     const index = CaptionContestGame.sharedImages.findIndex(img => img.id === imageId);
     if (index !== -1) {
       CaptionContestGame.sharedImages.splice(index, 1);
-      this.log(`Image deleted: ${imageId}`);
       this.io.emit('cap:images-list', CaptionContestGame.sharedImages);
     }
   }
 
-  /**
-   * Handle player disconnection mid-game
-   */
+  // ============ LIFECYCLE ============
+
   onPlayerDisconnect(playerId) {
-    // Remove their submission if in submitting phase
-    if (this.state === 'submitting') {
-      this.submissions = this.submissions.filter(s => s.playerId !== playerId);
-    }
-
-    // Remove their vote if in voting phase
-    if (this.state === 'voting') {
-      this.votes.delete(playerId);
-    }
-
-    // Remove their score
+    this.submissions = this.submissions.filter(s => s.playerId !== playerId);
+    this.matchupVotes.delete(playerId);
     this.scores.delete(playerId);
+    this.roundScores.delete(playerId);
+  }
+
+  destroy() {
+    this.clearTimer();
+    super.destroy();
   }
 }
 
