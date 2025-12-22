@@ -45,6 +45,8 @@ io.on('connection', (socket) => {
   socket.on('cc:create-room', (data) => roomManager.createRoom(socket, data));
   socket.on('cc:join-room', (data) => roomManager.joinRoom(socket, data));
   socket.on('cc:join-spectator', (data) => roomManager.joinSpectator(socket, data));
+  socket.on('cc:change-zone', (data) => roomManager.handleZoneChange(socket, data));
+  socket.on('cc:spectator-change-zone', (data) => roomManager.handleSpectatorZoneChange(socket, data));
   socket.on('cc:move', (data) => roomManager.handleMove(socket, data));
   socket.on('cc:interact', (data) => roomManager.handleInteract(socket, data));
   socket.on('cc:emote', (data) => roomManager.handleEmote(socket, data));
@@ -55,6 +57,7 @@ io.on('connection', (socket) => {
   socket.on('game:join-queue', (data) => roomManager.joinGameQueue(socket, data));
   socket.on('game:leave-queue', () => roomManager.leaveGameQueue(socket));
   socket.on('game:start-queued', () => roomManager.startQueuedGame(socket));
+  socket.on('game:request-queue', () => roomManager.sendQueueState(socket));
 
   // ============ Game Management Events ============
   socket.on('game:get-list', () => {

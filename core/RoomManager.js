@@ -1,15 +1,62 @@
 const WorldState = require('../world/WorldState');
+const { DEFAULT_ZONE, getZone, zoneExists } = require('../world/ZoneConfig');
 
 class RoomManager {
   constructor(io, gameRegistry = null) {
     this.io = io;
     this.gameRegistry = gameRegistry;
-    this.rooms = new Map(); // roomCode -> WorldState
     this.playerRooms = new Map(); // socketId -> roomCode
+    this.playerZones = new Map(); // socketId -> zoneId (which zone they're in within their room)
+    this.zoneStates = new Map(); // "roomCode:zoneId" -> WorldState
+    this.playerData = new Map(); // socketId -> { name, character, isVIP } (persistent player data)
     this.gameSessions = new Map(); // roomCode -> { game, players[], hostSocketId }
     this.playerGames = new Map(); // socketId -> roomCode (which game they're in)
     this.spectators = new Map(); // socketId -> roomCode (spectators watching rooms)
+    this.spectatorZones = new Map(); // socketId -> zoneId (which zone spectator is viewing)
     this.gameQueues = new Map(); // roomCode -> { gameType, players[] } - players waiting to start
+  }
+
+  /**
+   * Get or create a zone state for a room
+   */
+  getZoneState(roomCode, zoneId) {
+    const key = `${roomCode}:${zoneId}`;
+    if (!this.zoneStates.has(key)) {
+      this.zoneStates.set(key, new WorldState(roomCode, zoneId));
+    }
+    return this.zoneStates.get(key);
+  }
+
+  /**
+   * Get the socket.io room name for a zone
+   */
+  getZoneRoom(roomCode, zoneId) {
+    return `${roomCode}:${zoneId}`;
+  }
+
+  // Legacy getter for backward compatibility
+  get rooms() {
+    // Return a Map-like object that provides lobby zone states
+    const self = this;
+    return {
+      get(roomCode) {
+        return self.getZoneState(roomCode, DEFAULT_ZONE);
+      },
+      has(roomCode) {
+        return self.zoneStates.has(`${roomCode}:${DEFAULT_ZONE}`);
+      },
+      set(roomCode, worldState) {
+        self.zoneStates.set(`${roomCode}:${DEFAULT_ZONE}`, worldState);
+      },
+      delete(roomCode) {
+        // Delete all zones for this room
+        for (const key of self.zoneStates.keys()) {
+          if (key.startsWith(`${roomCode}:`)) {
+            self.zoneStates.delete(key);
+          }
+        }
+      }
+    };
   }
 
   /**
@@ -53,22 +100,14 @@ class RoomManager {
 
   /**
    * Join an existing room (auto-creates LOBBY if needed)
+   * Players start in the default zone (lobby)
    */
   joinRoom(socket, { roomCode, playerName, character, isVIP }) {
     const code = roomCode.toUpperCase();
-    let worldState = this.rooms.get(code);
+    const zoneId = DEFAULT_ZONE;
 
-    // Auto-create LOBBY room if it doesn't exist (persistent world)
-    if (!worldState && code === 'LOBBY') {
-      worldState = new WorldState(code);
-      this.rooms.set(code, worldState);
-      console.log(`[Room] Auto-created persistent LOBBY room`);
-    }
-
-    if (!worldState) {
-      socket.emit('cc:error', { message: 'Room not found' });
-      return;
-    }
+    // Get or create the zone state (auto-creates for LOBBY)
+    const zoneState = this.getZoneState(code, zoneId);
 
     // Leave any existing room first
     const existingRoom = this.playerRooms.get(socket.id);
@@ -76,17 +115,25 @@ class RoomManager {
       this.leaveRoom(socket);
     }
 
-    // Add player to world with character and VIP status
-    const player = worldState.addPlayer(socket.id, playerName, character, isVIP);
+    // Store persistent player data
+    this.playerData.set(socket.id, { name: playerName, character, isVIP });
 
-    // Track player's room
+    // Add player to zone
+    const player = zoneState.addPlayer(socket.id, playerName, character, isVIP);
+
+    // Track player's room and zone
     this.playerRooms.set(socket.id, code);
+    this.playerZones.set(socket.id, zoneId);
 
-    // Join socket.io room
+    // Join base room for room-wide events (game broadcasts)
     socket.join(code);
 
-    // Notify others in room
-    socket.to(code).emit('cc:player-joined', {
+    // Join socket.io room for this zone
+    const zoneRoom = this.getZoneRoom(code, zoneId);
+    socket.join(zoneRoom);
+
+    // Notify others in the same zone
+    socket.to(zoneRoom).emit('cc:player-joined', {
       playerId: socket.id,
       playerName: player.name,
       x: player.x,
@@ -97,44 +144,120 @@ class RoomManager {
 
     // Send state to joining player
     socket.emit('cc:room-joined', { roomCode: code });
-    socket.emit('cc:world-state', worldState.getState());
+    socket.emit('cc:world-state', zoneState.getState());
 
-    console.log(`[Room] ${playerName} joined ${code}`);
+    console.log(`[Room] ${playerName} joined ${code}:${zoneId}`);
+  }
+
+  /**
+   * Handle zone change (player moving between zones within a room)
+   */
+  handleZoneChange(socket, { targetZone }) {
+    const roomCode = this.playerRooms.get(socket.id);
+    if (!roomCode) {
+      socket.emit('cc:error', { message: 'Not in a room' });
+      return;
+    }
+
+    // Validate target zone exists
+    if (!zoneExists(targetZone)) {
+      socket.emit('cc:error', { message: 'Invalid zone' });
+      return;
+    }
+
+    const currentZone = this.playerZones.get(socket.id) || DEFAULT_ZONE;
+    if (currentZone === targetZone) {
+      return; // Already in this zone
+    }
+
+    // Get player data
+    const playerInfo = this.playerData.get(socket.id);
+    if (!playerInfo) {
+      socket.emit('cc:error', { message: 'Player data not found' });
+      return;
+    }
+
+    // Get current zone state and remove player
+    const currentZoneState = this.getZoneState(roomCode, currentZone);
+    currentZoneState.removePlayer(socket.id);
+
+    // Leave current zone's socket.io room
+    const currentZoneRoom = this.getZoneRoom(roomCode, currentZone);
+    socket.leave(currentZoneRoom);
+
+    // Notify players in current zone that player left
+    this.io.to(currentZoneRoom).emit('cc:player-left', {
+      playerId: socket.id,
+    });
+
+    // Get target zone state and add player at spawn point
+    const targetZoneState = this.getZoneState(roomCode, targetZone);
+    const targetZoneConfig = getZone(targetZone);
+    const player = targetZoneState.addPlayer(
+      socket.id,
+      playerInfo.name,
+      playerInfo.character,
+      playerInfo.isVIP
+    );
+
+    // Update zone tracking
+    this.playerZones.set(socket.id, targetZone);
+
+    // Join new zone's socket.io room
+    const targetZoneRoom = this.getZoneRoom(roomCode, targetZone);
+    socket.join(targetZoneRoom);
+
+    // Send zone change confirmation with new state
+    socket.emit('cc:zone-changed', {
+      zoneId: targetZone,
+      zoneName: targetZoneConfig.name,
+    });
+    socket.emit('cc:world-state', targetZoneState.getState());
+
+    // Notify players in new zone that player joined
+    socket.to(targetZoneRoom).emit('cc:player-joined', {
+      playerId: socket.id,
+      playerName: player.name,
+      x: player.x,
+      y: player.y,
+      character: player.character,
+      isVIP: player.isVIP,
+    });
+
+    console.log(`[Room] ${playerInfo.name} moved from ${currentZone} to ${targetZone} in ${roomCode}`);
   }
 
   /**
    * Join a room as a spectator (for host/TV display)
+   * Spectators start viewing the default zone (lobby)
    */
   joinSpectator(socket, { roomCode }) {
     const code = roomCode.toUpperCase();
-    let worldState = this.rooms.get(code);
+    const zoneId = DEFAULT_ZONE;
 
-    // Auto-create LOBBY room if it doesn't exist
-    if (!worldState && code === 'LOBBY') {
-      worldState = new WorldState(code);
-      this.rooms.set(code, worldState);
-      console.log(`[Room] Auto-created persistent LOBBY room for spectator`);
-    }
-
-    if (!worldState) {
-      socket.emit('cc:error', { message: 'Room not found' });
-      return;
-    }
+    // Get or create the zone state
+    const zoneState = this.getZoneState(code, zoneId);
 
     // Track spectator
     this.spectators.set(socket.id, code);
+    this.spectatorZones.set(socket.id, zoneId);
 
-    // Join socket.io room to receive broadcasts
+    // Join base room for room-wide events (queue updates, game events)
     socket.join(code);
+
+    // Join socket.io room for this zone
+    const zoneRoom = this.getZoneRoom(code, zoneId);
+    socket.join(zoneRoom);
 
     // Send spectator confirmation
     socket.emit('cc:spectator-joined', {
       roomCode: code,
-      playerCount: worldState.getPlayerCount(),
+      zoneId: zoneId,
+      playerCount: zoneState.getPlayerCount(),
     });
 
-    // Send full world state (same as players get)
-    socket.emit('cc:world-state', worldState.getState());
+    // Send full world state
+    socket.emit('cc:world-state', zoneState.getState());
 
     // If there's an active game, send game state too
     const gameSession = this.gameSessions.get(code);
@@ -145,7 +268,51 @@ class RoomManager {
       });
     }
 
-    console.log(`[Room] Spectator joined ${code}`);
+    console.log(`[Room] Spectator joined ${code}:${zoneId}`);
+  }
+
+  /**
+   * Handle spectator zone change (for host/TV switching between zones)
+   */
+  handleSpectatorZoneChange(socket, { zoneId }) {
+    const roomCode = this.spectators.get(socket.id);
+    if (!roomCode) {
+      socket.emit('cc:error', { message: 'Not a spectator' });
+      return;
+    }
+
+    if (!zoneExists(zoneId)) {
+      socket.emit('cc:error', { message: 'Invalid zone' });
+      return;
+    }
+
+    const currentZone = this.spectatorZones.get(socket.id) || DEFAULT_ZONE;
+    if (currentZone === zoneId) {
+      return; // Already viewing this zone
+    }
+
+    // Leave current zone room
+    const currentZoneRoom = this.getZoneRoom(roomCode, currentZone);
+    socket.leave(currentZoneRoom);
+
+    // Join new zone room
+    const newZoneRoom = this.getZoneRoom(roomCode, zoneId);
+    socket.join(newZoneRoom);
+
+    // Update tracking
+    this.spectatorZones.set(socket.id, zoneId);
+
+    // Send new zone state
+    const zoneState = this.getZoneState(roomCode, zoneId);
+    const zoneConfig = getZone(zoneId);
+
+    socket.emit('cc:zone-changed', {
+      zoneId: zoneId,
+      zoneName: zoneConfig.name,
+    });
+    socket.emit('cc:world-state', zoneState.getState());
+
+    console.log(`[Room] Spectator switched to ${zoneId} in ${roomCode}`);
   }
 
   /**
@@ -155,15 +322,16 @@ class RoomManager {
     const roomCode = this.playerRooms.get(socket.id);
     if (!roomCode) return;
 
-    const worldState = this.rooms.get(roomCode);
-    if (!worldState) return;
+    const zoneId = this.playerZones.get(socket.id) || DEFAULT_ZONE;
+    const zoneState = this.getZoneState(roomCode, zoneId);
 
     // Update position (with validation)
-    const player = worldState.movePlayer(socket.id, x, y);
+    const player = zoneState.movePlayer(socket.id, x, y);
     if (!player) return;
 
-    // Broadcast to all in room (including sender for reconciliation)
-    this.io.to(roomCode).emit('cc:player-moved', {
+    // Broadcast to all in the same zone
+    const zoneRoom = this.getZoneRoom(roomCode, zoneId);
+    this.io.to(zoneRoom).emit('cc:player-moved', {
       playerId: socket.id,
       x: player.x,
       y: player.y,
@@ -177,21 +345,23 @@ class RoomManager {
     const roomCode = this.playerRooms.get(socket.id);
     if (!roomCode) return;
 
-    const worldState = this.rooms.get(roomCode);
-    if (!worldState) return;
+    const zoneId = this.playerZones.get(socket.id) || DEFAULT_ZONE;
+    const zoneState = this.getZoneState(roomCode, zoneId);
 
-    const player = worldState.players.get(socket.id);
-    const result = worldState.handleInteraction(socket.id, objectId);
+    const player = zoneState.players.get(socket.id);
+    const result = zoneState.handleInteraction(socket.id, objectId);
 
-    // If the interaction launches a game, include available games and broadcast to room
+    // If the interaction launches a game, include available games and broadcast to zone
     if (result.action === 'launch-game' && this.gameRegistry) {
       result.availableGames = this.gameRegistry.getGameList();
 
-      // Broadcast arcade activation to all in room (for host display)
-      this.io.to(roomCode).emit('cc:arcade-activated', {
+      // Broadcast arcade activation to all in zone (for host display)
+      const zoneRoom = this.getZoneRoom(roomCode, zoneId);
+      this.io.to(zoneRoom).emit('cc:arcade-activated', {
         playerId: socket.id,
         playerName: player?.name || 'Unknown',
         objectId,
+        gameType: result.gameType,
       });
     }
 
@@ -208,8 +378,11 @@ class RoomManager {
     const roomCode = this.playerRooms.get(socket.id);
     if (!roomCode) return;
 
-    // Broadcast emote to all in room
-    this.io.to(roomCode).emit('cc:emote-played', {
+    const zoneId = this.playerZones.get(socket.id) || DEFAULT_ZONE;
+    const zoneRoom = this.getZoneRoom(roomCode, zoneId);
+
+    // Broadcast emote to all in zone
+    this.io.to(zoneRoom).emit('cc:emote-played', {
       playerId: socket.id,
       emoteId,
     });
@@ -222,41 +395,43 @@ class RoomManager {
     const roomCode = this.playerRooms.get(socket.id);
     if (!roomCode) return;
 
-    const worldState = this.rooms.get(roomCode);
-    if (!worldState) return;
+    const zoneId = this.playerZones.get(socket.id) || DEFAULT_ZONE;
+    const zoneState = this.getZoneState(roomCode, zoneId);
 
-    const player = worldState.players.get(socket.id);
+    const player = zoneState.players.get(socket.id);
     if (!player) return;
 
     // Sanitize message (basic - remove scripts, limit length)
     const cleanMessage = message.slice(0, 100).replace(/[<>]/g, '');
 
-    // Broadcast chat to all in room
-    this.io.to(roomCode).emit('cc:chat-message', {
+    // Broadcast chat to all in zone
+    const zoneRoom = this.getZoneRoom(roomCode, zoneId);
+    this.io.to(zoneRoom).emit('cc:chat-message', {
       playerId: socket.id,
       playerName: player.name,
       message: cleanMessage,
     });
-
-    console.log(`[Chat] ${player.name}: ${cleanMessage}`);
   }
 
   /**
    * Send current world state to a socket (works for both players and spectators)
    */
   sendWorldState(socket) {
-    // Check both players and spectators
+    // Check if player
     let roomCode = this.playerRooms.get(socket.id);
+    let zoneId = this.playerZones.get(socket.id);
+
+    // Check if spectator
     if (!roomCode) {
       roomCode = this.spectators.get(socket.id);
+      zoneId = this.spectatorZones.get(socket.id);
     }
+
     if (!roomCode) return;
+    zoneId = zoneId || DEFAULT_ZONE;
 
-    const worldState = this.rooms.get(roomCode);
-    if (!worldState) return;
-
-    socket.emit('cc:world-state', worldState.getState());
-    console.log(`[Room] Sent world state to ${socket.id} in ${roomCode}`);
+    const zoneState = this.getZoneState(roomCode, zoneId);
+    socket.emit('cc:world-state', zoneState.getState());
   }
 
   // ============ Game Queue Management ============
@@ -277,11 +452,12 @@ class RoomManager {
       return;
     }
 
-    const worldState = this.rooms.get(roomCode);
-    if (!worldState) return;
-
-    const player = worldState.players.get(socket.id);
-    if (!player) return;
+    // Get player data (persistent across zones)
+    const player = this.playerData.get(socket.id);
+    if (!player) {
+      console.log(`[Queue] Player data not found for ${socket.id}`);
+      return;
+    }
 
     // Get or create queue for this room
     let queue = this.gameQueues.get(roomCode);
@@ -353,6 +529,29 @@ class RoomManager {
   }
 
   /**
+   * Send current queue state to a socket (for host to refresh)
+   */
+  sendQueueState(socket) {
+    // Check if spectator or player
+    let roomCode = this.spectators.get(socket.id);
+    if (!roomCode) {
+      roomCode = this.playerRooms.get(socket.id);
+    }
+    if (!roomCode) {
+      console.log(`[Queue] sendQueueState: socket ${socket.id} not in any room`);
+      return;
+    }
+
+    const queue = this.gameQueues.get(roomCode);
+
+    socket.emit('game:queue-update', {
+      gameType: queue?.gameType || null,
+      players: queue?.players || [],
+      count: queue?.players?.length || 0,
+    });
+  }
+
+  /**
    * Host starts the game with queued players
    */
   startQueuedGame(socket) {
@@ -399,24 +598,20 @@ class RoomManager {
       return;
     }
 
-    const worldState = this.rooms.get(roomCode);
-    if (!worldState) {
-      this.io.to(hostSocketId).emit('game:error', { message: 'Room not found' });
-      return;
-    }
-
     // Check if a game is already running
     if (this.gameSessions.has(roomCode)) {
       this.io.to(hostSocketId).emit('game:error', { message: 'A game is already running' });
       return;
     }
 
-    // Get players for the game
+    // Get players for the game using playerData (zone-agnostic)
     const gamePlayers = [];
     for (const playerId of playerIds) {
-      const player = worldState.players.get(playerId);
+      const player = this.playerData.get(playerId);
       if (player) {
         gamePlayers.push({ id: playerId, name: player.name });
+      } else {
+        console.log(`[Game] Player ${playerId} not found in playerData`);
       }
     }
 
@@ -713,6 +908,7 @@ class RoomManager {
     if (this.spectators.has(socket.id)) {
       const roomCode = this.spectators.get(socket.id);
       this.spectators.delete(socket.id);
+      this.spectatorZones.delete(socket.id);
       console.log(`[Room] Spectator left ${roomCode}`);
       return;
     }
@@ -726,27 +922,71 @@ class RoomManager {
     const roomCode = this.playerRooms.get(socket.id);
     if (!roomCode) return;
 
-    const worldState = this.rooms.get(roomCode);
-    if (worldState) {
-      worldState.removePlayer(socket.id);
+    const zoneId = this.playerZones.get(socket.id) || DEFAULT_ZONE;
+    const zoneState = this.getZoneState(roomCode, zoneId);
 
-      // Notify others (including spectators)
-      socket.to(roomCode).emit('cc:player-left', {
+    if (zoneState) {
+      zoneState.removePlayer(socket.id);
+
+      // Notify others in the same zone
+      const zoneRoom = this.getZoneRoom(roomCode, zoneId);
+      this.io.to(zoneRoom).emit('cc:player-left', {
         playerId: socket.id,
       });
 
       // Clean up empty rooms (but keep LOBBY persistent)
-      if (worldState.getPlayerCount() === 0 && roomCode !== 'LOBBY') {
+      // Check if ALL zones in the room are empty
+      let totalPlayers = 0;
+      for (const [key, state] of this.zoneStates.entries()) {
+        if (key.startsWith(`${roomCode}:`)) {
+          totalPlayers += state.getPlayerCount();
+        }
+      }
+
+      if (totalPlayers === 0 && roomCode !== 'LOBBY') {
         // Also clean up any game session
         if (this.gameSessions.has(roomCode)) {
           this.endGameSession(roomCode);
         }
-        this.rooms.delete(roomCode);
+        // Delete all zones for this room
+        for (const key of this.zoneStates.keys()) {
+          if (key.startsWith(`${roomCode}:`)) {
+            this.zoneStates.delete(key);
+          }
+        }
         console.log(`[Room] Deleted empty room ${roomCode}`);
       }
     }
 
+    // Clean up player tracking
     this.playerRooms.delete(socket.id);
+    this.playerZones.delete(socket.id);
+    this.playerData.delete(socket.id);
+  }
+
+  /**
+   * Leave current room (called when switching rooms)
+   */
+  leaveRoom(socket) {
+    const roomCode = this.playerRooms.get(socket.id);
+    if (!roomCode) return;
+
+    const zoneId = this.playerZones.get(socket.id) || DEFAULT_ZONE;
+    const zoneState = this.getZoneState(roomCode, zoneId);
+
+    if (zoneState) {
+      zoneState.removePlayer(socket.id);
+
+      // Notify others in the same zone
+      const zoneRoom = this.getZoneRoom(roomCode, zoneId);
+      socket.leave(zoneRoom);
+      this.io.to(zoneRoom).emit('cc:player-left', {
+        playerId: socket.id,
+      });
+    }
+
+    this.playerRooms.delete(socket.id);
+    this.playerZones.delete(socket.id);
   }
 }
 

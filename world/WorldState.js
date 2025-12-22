@@ -1,34 +1,35 @@
-const CHARACTERS = ['penguin', 'bear', 'fox', 'cat', 'dog', 'rabbit'];
-const SPAWN_POINT = { x: 400, y: 300 };
-const WORLD_BOUNDS = { minX: 50, maxX: 750, minY: 50, maxY: 550 };
+const { getZone, DEFAULT_ZONE } = require('./ZoneConfig');
 
 class WorldState {
-  constructor(roomCode) {
+  constructor(roomCode, zoneId = DEFAULT_ZONE) {
     this.roomCode = roomCode;
+    this.zoneId = zoneId;
     this.players = new Map(); // socketId -> player data
-    this.characterIndex = 0;
 
-    // Interactive objects in the world
-    this.objects = [
-      { id: 'door-1', type: 'door', x: 700, y: 300, emoji: '🚪', action: 'zone-change' },
-      { id: 'arcade-1', type: 'arcade', x: 200, y: 150, emoji: '🕹️', action: 'launch-game' },
-      { id: 'tree-1', type: 'decoration', x: 100, y: 400, emoji: '🌲' },
-      { id: 'tree-2', type: 'decoration', x: 600, y: 450, emoji: '🌲' },
-    ];
+    // Load zone-specific configuration
+    const zoneConfig = getZone(zoneId);
+    this.zoneName = zoneConfig.name;
+    this.spawnPoint = zoneConfig.spawnPoint;
+    this.bounds = zoneConfig.bounds;
+    this.objects = zoneConfig.objects;
   }
 
   /**
    * Add a player to the world
    */
-  addPlayer(socketId, name, character = '🤡', isVIP = false) {
+  addPlayer(socketId, name, character = '🤡', isVIP = false, spawnX = null, spawnY = null) {
     // Limit name to 8 characters
     const safeName = (name || `Player${this.players.size + 1}`).slice(0, 8);
+
+    // Use provided spawn position or zone's default spawn with slight randomness
+    const x = spawnX !== null ? spawnX : this.spawnPoint.x + (Math.random() - 0.5) * 50;
+    const y = spawnY !== null ? spawnY : this.spawnPoint.y + (Math.random() - 0.5) * 50;
 
     const player = {
       id: socketId,
       name: safeName,
-      x: SPAWN_POINT.x + (Math.random() - 0.5) * 50,
-      y: SPAWN_POINT.y + (Math.random() - 0.5) * 50,
+      x,
+      y,
       character: character || '🤡',
       isVIP: isVIP || false,
     };
@@ -51,9 +52,9 @@ class WorldState {
     const player = this.players.get(socketId);
     if (!player) return null;
 
-    // Clamp to world bounds
-    player.x = Math.max(WORLD_BOUNDS.minX, Math.min(WORLD_BOUNDS.maxX, x));
-    player.y = Math.max(WORLD_BOUNDS.minY, Math.min(WORLD_BOUNDS.maxY, y));
+    // Clamp to zone bounds
+    player.x = Math.max(this.bounds.minX, Math.min(this.bounds.maxX, x));
+    player.y = Math.max(this.bounds.minY, Math.min(this.bounds.maxY, y));
 
     return player;
   }
@@ -69,9 +70,19 @@ class WorldState {
 
     switch (obj.action) {
       case 'zone-change':
-        return { success: true, action: 'zone-change', zone: 'lobby' };
+        return {
+          success: true,
+          action: 'zone-change',
+          targetZone: obj.targetZone,
+          label: obj.label,
+        };
       case 'launch-game':
-        return { success: true, action: 'launch-game', game: 'party-games' };
+        return {
+          success: true,
+          action: 'launch-game',
+          gameType: obj.gameType,
+          label: obj.label,
+        };
       default:
         return { success: true, action: 'none' };
     }
@@ -90,9 +101,18 @@ class WorldState {
   getState() {
     return {
       roomCode: this.roomCode,
+      zoneId: this.zoneId,
+      zoneName: this.zoneName,
       players: Array.from(this.players.values()),
       objects: this.objects,
     };
+  }
+
+  /**
+   * Get a player's data
+   */
+  getPlayer(socketId) {
+    return this.players.get(socketId);
   }
 }
 

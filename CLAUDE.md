@@ -15,7 +15,7 @@ npm start        # Production start
 clown-club/
 ├── server.js              # Entry point, Socket.IO setup
 ├── core/
-│   ├── RoomManager.js     # Room, spectator, game session management
+│   ├── RoomManager.js     # Room, spectator, game session, zone management
 │   └── GameRegistry.js    # Game type registration
 ├── games/
 │   ├── BaseGame.js        # Abstract base class for all games
@@ -24,7 +24,8 @@ clown-club/
 │   └── caption-contest/
 │       └── CaptionContestGame.js  # Caption contest game
 ├── world/
-│   └── WorldState.js      # Player positions, interactions
+│   ├── WorldState.js      # Zone-aware player positions, interactions
+│   └── ZoneConfig.js      # Zone definitions (lobby, games room)
 ├── data/
 │   └── (config files)     # World configuration
 └── client/                # (Reserved for future client code)
@@ -33,10 +34,31 @@ clown-club/
 ## Key Files
 
 - `server.js` - Socket.IO server entry, event routing
-- `core/RoomManager.js` - Manages rooms, players, spectators, game sessions, queues
+- `core/RoomManager.js` - Manages rooms, players, spectators, game sessions, queues, zones
 - `core/GameRegistry.js` - Registers game types, validates player counts
 - `games/BaseGame.js` - Base class all games extend
-- `world/WorldState.js` - Virtual world player state
+- `world/WorldState.js` - Zone-aware virtual world player state
+- `world/ZoneConfig.js` - Zone definitions with objects, spawn points, bounds
+
+## Zone System
+
+Club Penguin-style multi-room navigation. Players can move between zones within a room.
+
+### Zones
+- `lobby` - Main town square with buildings, door to games room
+- `games` - Arcade room with game cabinets (Board Rush, Caption Contest)
+
+### Socket Rooms
+Players join multiple socket.io rooms:
+- Base room (`LOBBY`) - for room-wide events (game broadcasts)
+- Zone room (`LOBBY:lobby`, `LOBBY:games`) - for zone-specific events
+
+### Zone Events
+```
+cc:change-zone           Player requests zone change
+cc:zone-changed          Server confirms zone change
+cc:spectator-change-zone Host switches viewing zone
+```
 
 ## Socket Event Convention
 
