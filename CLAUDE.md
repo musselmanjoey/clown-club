@@ -113,6 +113,7 @@ Server -> Client:
 ### Game-Specific Events
 - `bg:*` - Board Game events
 - `cap:*` - Caption Contest events
+- `ay:*` - About You events
 
 ## Adding a New Game
 

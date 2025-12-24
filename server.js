@@ -4,6 +4,7 @@ const RoomManager = require('./core/RoomManager');
 const GameRegistry = require('./core/GameRegistry');
 const BoardGame = require('./games/board-game/BoardGame');
 const CaptionContestGame = require('./games/caption-contest/CaptionContestGame');
+const AboutYouGame = require('./games/about-you/AboutYouGame');
 
 const PORT = process.env.PORT || 3015;
 
@@ -33,6 +34,7 @@ const io = new Server(httpServer, {
 const gameRegistry = new GameRegistry();
 gameRegistry.register('board-game', BoardGame);
 gameRegistry.register('caption-contest', CaptionContestGame);
+gameRegistry.register('about-you', AboutYouGame);
 
 // Initialize room manager with game registry
 const roomManager = new RoomManager(io, gameRegistry);
@@ -68,11 +70,11 @@ io.on('connection', (socket) => {
   socket.on('game:request-state', () => roomManager.sendGameState(socket));
   socket.on('game:leave', () => roomManager.leaveGame(socket));
 
-  // ============ Game-Specific Events (bg:, cap: prefixes) ============
+  // ============ Game-Specific Events (bg:, cap:, ay: prefixes) ============
   // Route game events to active game instance
   socket.onAny((event, data) => {
     // Only handle game-prefixed events
-    if (event.startsWith('bg:') || event.startsWith('cap:')) {
+    if (event.startsWith('bg:') || event.startsWith('cap:') || event.startsWith('ay:')) {
       roomManager.handleGameEvent(socket, event, data);
     }
   });
