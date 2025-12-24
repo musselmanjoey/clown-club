@@ -83,6 +83,13 @@ class WorldState {
           gameType: obj.gameType,
           label: obj.label,
         };
+      case 'under-construction':
+        return {
+          success: true,
+          action: 'under-construction',
+          message: obj.message || 'Coming soon!',
+          label: obj.label,
+        };
       default:
         return { success: true, action: 'none' };
     }
