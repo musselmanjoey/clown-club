@@ -146,6 +146,19 @@ const MyGame = require('./games/my-game/MyGame');
 gameRegistry.register('my-game', MyGame);
 ```
 
+3. Add arcade cabinet in `world/ZoneConfig.js`:
+```javascript
+{ id: 'arcade-mygame', type: 'arcade', x: 459, y: 319, emoji: '', action: 'launch-game', gameType: 'my-game', label: 'My Game' }
+```
+
+4. Create client scenes in `joey-musselman-site/lib/clown-club/phaser/scenes/`:
+   - `MyGameScene.ts` - Player controller (800x600)
+   - `HostMyGameScene.ts` - TV display (1280x720)
+
+5. Register scenes in Phaser wrappers:
+   - `PhaserWrapper.tsx` - Add to player scene list
+   - `HostPhaserWrapper.tsx` - Add to host scene list
+
 ## Related Projects
 
 | Project | Path | Description |
