@@ -9,18 +9,10 @@ const ZONES = {
     spawnPoint: { x: 400, y: 480 },
     bounds: { minX: 50, maxX: 750, minY: 200, maxY: 550 },
     objects: [
-      // Buildings
-      { id: 'building-cafe', type: 'building', x: 120, y: 280, emoji: '☕', action: 'under-construction', label: 'Cafe', message: 'The Cafe is coming soon! ☕' },
-      { id: 'building-records', type: 'building', x: 400, y: 260, emoji: '🎵', action: 'under-construction', label: 'Records', message: 'The Record Store is coming soon! 🎵' },
-      { id: 'door-arcade', type: 'door', x: 680, y: 280, emoji: '🕹️', action: 'zone-change', targetZone: 'games', label: 'Arcade' },
-      // Props
-      { id: 'info-stand', type: 'info', x: 400, y: 420, emoji: '📋', action: 'under-construction', label: 'Info', message: 'Info board coming soon!' },
-      { id: 'bench-left', type: 'decoration', x: 150, y: 420, emoji: '🪑' },
-      { id: 'bench-right', type: 'decoration', x: 650, y: 420, emoji: '🪑' },
-      { id: 'tree-1', type: 'decoration', x: 50, y: 350, emoji: '🌲' },
-      { id: 'tree-2', type: 'decoration', x: 750, y: 360, emoji: '🌲' },
-      { id: 'lamp-1', type: 'decoration', x: 250, y: 380, emoji: '🏮' },
-      { id: 'lamp-2', type: 'decoration', x: 550, y: 380, emoji: '🏮' },
+      // Building doors - invisible hitboxes over actual doors in the background
+      { id: 'door-cafe', type: 'door', x: 189, y: 315, emoji: '', action: 'under-construction', label: 'Cafe', message: 'The Cafe is coming soon! ☕' },
+      { id: 'door-records', type: 'door', x: 407, y: 300, emoji: '', action: 'under-construction', label: 'Records', message: 'The Record Store is coming soon! 🎵' },
+      { id: 'door-arcade', type: 'door', x: 630, y: 322, emoji: '', action: 'zone-change', targetZone: 'games', label: 'Arcade' },
     ],
   },
   games: {
