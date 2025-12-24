@@ -17,23 +17,18 @@ const ZONES = {
   },
   games: {
     name: 'Game Room',
-    spawnPoint: { x: 100, y: 500 },
-    bounds: { minX: 50, maxX: 750, minY: 120, maxY: 550 },
+    spawnPoint: { x: 400, y: 500 },
+    bounds: { minX: 50, maxX: 750, minY: 200, maxY: 550 },
     objects: [
-      // Exit door
-      { id: 'door-lobby', type: 'door', x: 80, y: 520, emoji: '🚪', action: 'zone-change', targetZone: 'lobby', label: 'Exit' },
-      // Arcade cabinets (4 games)
-      { id: 'arcade-caption', type: 'arcade', x: 150, y: 180, emoji: '📸', action: 'launch-game', gameType: 'caption-contest', label: 'Caption Contest' },
-      { id: 'arcade-board', type: 'arcade', x: 300, y: 180, emoji: '🎲', action: 'launch-game', gameType: 'board-game', label: 'Board Rush' },
-      { id: 'arcade-about', type: 'arcade', x: 500, y: 180, emoji: '💭', action: 'under-construction', label: 'About You', message: 'About You is coming soon! 💭' },
-      { id: 'arcade-newlywebs', type: 'arcade', x: 650, y: 180, emoji: '🕸️', action: 'under-construction', label: 'Newly Webs', message: 'Newly Webs is coming soon! 🕸️' },
-      // Decorative props
-      { id: 'lava-lamp-1', type: 'decoration', x: 80, y: 350, emoji: '🪔' },
-      { id: 'lava-lamp-2', type: 'decoration', x: 400, y: 450, emoji: '🪔' },
-      { id: 'bean-bag-1', type: 'decoration', x: 250, y: 400, emoji: '🛋️' },
-      { id: 'bean-bag-2', type: 'decoration', x: 550, y: 420, emoji: '🛋️' },
-      { id: 'bean-bag-3', type: 'decoration', x: 680, y: 380, emoji: '🛋️' },
-      { id: 'stats-panel', type: 'info', x: 720, y: 450, emoji: '📊', action: 'under-construction', label: 'Stats', message: 'Game stats coming soon! 📊' },
+      // Exit door (invisible hitbox - visual is in background)
+      { id: 'door-lobby', type: 'door', x: 92, y: 376, emoji: '', action: 'zone-change', targetZone: 'lobby', label: 'Exit' },
+      // Arcade cabinets (invisible hitboxes - visuals are in background)
+      { id: 'arcade-caption', type: 'arcade', x: 249, y: 316, emoji: '', action: 'launch-game', gameType: 'caption-contest', label: 'Caption Contest' },
+      { id: 'arcade-board', type: 'arcade', x: 356, y: 319, emoji: '', action: 'launch-game', gameType: 'board-game', label: 'Board Rush' },
+      { id: 'arcade-about', type: 'arcade', x: 459, y: 319, emoji: '', action: 'under-construction', label: 'About You', message: 'About You is coming soon! 💭' },
+      { id: 'arcade-newlywebs', type: 'arcade', x: 560, y: 316, emoji: '', action: 'under-construction', label: 'Newly Webs', message: 'Newly Webs is coming soon! 🕸️' },
+      // Leaderboard/stats panel
+      { id: 'stats-panel', type: 'info', x: 716, y: 261, emoji: '', action: 'under-construction', label: 'Leaderboard', message: 'Leaderboard coming soon! 📊' },
     ],
   },
 };
