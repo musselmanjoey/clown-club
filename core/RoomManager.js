@@ -840,7 +840,14 @@ class RoomManager {
    * Handle game-specific events
    */
   handleGameEvent(socket, event, data) {
-    const roomCode = this.playerGames.get(socket.id);
+    // Check if sender is a player
+    let roomCode = this.playerGames.get(socket.id);
+
+    // Also allow spectators (host) to send certain game events
+    if (!roomCode) {
+      roomCode = this.spectators.get(socket.id);
+    }
+
     if (!roomCode) return;
 
     const session = this.gameSessions.get(roomCode);

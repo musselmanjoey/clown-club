@@ -11,6 +11,7 @@ class CaptionContestGame extends BaseGame {
   static description = 'Submit funny captions and vote head-to-head!';
   static minPlayers = 1;
   static maxPlayers = 12;
+  static totalRounds = 5;
 
   // Timer durations (ms)
   static TIMERS = {
@@ -19,6 +20,7 @@ class CaptionContestGame extends BaseGame {
     voting: 12000,
     matchupResult: 4000,
     roundSummary: 5000,
+    gameOver: 8000,
   };
 
   constructor(room, io) {
@@ -111,6 +113,10 @@ class CaptionContestGame extends BaseGame {
 
       case 'round-summary':
         this.showRoundSummary();
+        break;
+
+      case 'game-over':
+        this.showGameOver();
         break;
     }
   }
@@ -266,10 +272,37 @@ class CaptionContestGame extends BaseGame {
 
     this.broadcastPhase('round-summary', {
       round: this.currentRound,
+      totalRounds: CaptionContestGame.totalRounds,
       scores,
+      isLastRound: this.currentRound >= CaptionContestGame.totalRounds,
     });
 
     // Don't auto-advance - wait for host to click next round
+  }
+
+  showGameOver() {
+    const duration = CaptionContestGame.TIMERS.gameOver;
+    const scores = this.getScoreboard();
+    const winner = scores[0];
+
+    this.broadcastPhase('game-over', {
+      winner: winner ? { name: winner.name, score: winner.score } : null,
+      finalScores: scores,
+    });
+
+    // End the game after displaying results
+    this.startTimer(duration, () => {
+      this.endGame();
+    });
+  }
+
+  endGame() {
+    this.setState('ended');
+    this.log('Game ended');
+    this.broadcast('game:ended', {
+      gameType: 'caption-contest',
+      finalScores: this.getScoreboard(),
+    });
   }
 
   // ============ HELPERS ============
@@ -436,9 +469,15 @@ class CaptionContestGame extends BaseGame {
   }
 
   handleNextRound(socket) {
-    // Allow any player to advance for now (or restrict to host)
+    // Allow any player or spectator to advance
     if (this.phase !== 'round-summary') return;
-    this.nextRound();
+
+    // Check if game is over
+    if (this.currentRound >= CaptionContestGame.totalRounds) {
+      this.startPhase('game-over');
+    } else {
+      this.nextRound();
+    }
   }
 
   // ============ STATE GETTERS ============
