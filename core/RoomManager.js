@@ -150,6 +150,21 @@ class RoomManager {
   }
 
   /**
+   * Clean up empty zone states to prevent memory leaks
+   */
+  cleanupEmptyZones(roomCode) {
+    for (const [key, state] of this.zoneStates.entries()) {
+      if (key.startsWith(`${roomCode}:`) && state.getPlayerCount() === 0) {
+        // Keep the default zone for the room, only clean up other empty zones
+        const zoneId = key.split(':')[1];
+        if (zoneId !== DEFAULT_ZONE) {
+          this.zoneStates.delete(key);
+        }
+      }
+    }
+  }
+
+  /**
    * Handle zone change (player moving between zones within a room)
    */
   handleZoneChange(socket, { targetZone }) {
@@ -189,6 +204,9 @@ class RoomManager {
     this.io.to(currentZoneRoom).emit('cc:player-left', {
       playerId: socket.id,
     });
+
+    // Clean up empty zones to prevent memory buildup
+    this.cleanupEmptyZones(roomCode);
 
     // Get target zone state and add player at spawn point
     const targetZoneState = this.getZoneState(roomCode, targetZone);

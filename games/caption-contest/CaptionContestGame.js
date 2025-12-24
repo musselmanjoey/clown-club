@@ -43,16 +43,14 @@ class CaptionContestGame extends BaseGame {
     this.matchupVotes = new Map();
     this.roundScores = new Map(); // Track points earned this round
 
-    // Image management
-    this.gameImages = CaptionContestGame.sharedImages;
+    // Image management - per-instance, not shared across games
+    this.images = [];
 
     // Initialize scores
     for (const player of room.players) {
       this.scores.set(player.id, 0);
     }
   }
-
-  static sharedImages = [];
 
   // ============ GAME FLOW ============
 
@@ -371,7 +369,7 @@ class CaptionContestGame extends BaseGame {
         this.handleNextRound(socket);
         break;
       case 'cap:get-images':
-        socket.emit('cap:images-list', CaptionContestGame.sharedImages);
+        socket.emit('cap:images-list', this.images);
         break;
       case 'cap:upload-image':
         this.handleUploadImage(socket, data);
@@ -553,7 +551,7 @@ class CaptionContestGame extends BaseGame {
   // ============ IMAGE MANAGEMENT ============
 
   getRandomImage() {
-    const activeImages = CaptionContestGame.sharedImages.filter(img => img.active);
+    const activeImages = this.images.filter(img => img.active);
     if (activeImages.length === 0) {
       return `https://picsum.photos/seed/${Date.now()}/800/600`;
     }
@@ -584,27 +582,27 @@ class CaptionContestGame extends BaseGame {
         uploadedAt: Date.now(),
       };
 
-      CaptionContestGame.sharedImages.push(newImage);
+      this.images.push(newImage);
       socket.emit('cap:image-uploaded', { success: true, image: newImage });
-      this.io.emit('cap:images-list', CaptionContestGame.sharedImages);
+      this.broadcast('cap:images-list', this.images);
     } catch (error) {
       socket.emit('cap:image-uploaded', { success: false, message: error.message });
     }
   }
 
   handleToggleImage(socket, { imageId }) {
-    const image = CaptionContestGame.sharedImages.find(img => img.id === imageId);
+    const image = this.images.find(img => img.id === imageId);
     if (image) {
       image.active = !image.active;
-      this.io.emit('cap:images-list', CaptionContestGame.sharedImages);
+      this.broadcast('cap:images-list', this.images);
     }
   }
 
   handleDeleteImage(socket, { imageId }) {
-    const index = CaptionContestGame.sharedImages.findIndex(img => img.id === imageId);
+    const index = this.images.findIndex(img => img.id === imageId);
     if (index !== -1) {
-      CaptionContestGame.sharedImages.splice(index, 1);
-      this.io.emit('cap:images-list', CaptionContestGame.sharedImages);
+      this.images.splice(index, 1);
+      this.broadcast('cap:images-list', this.images);
     }
   }
 
