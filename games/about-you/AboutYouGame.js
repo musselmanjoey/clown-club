@@ -32,16 +32,50 @@ class AboutYouGame extends BaseGame {
     PLAYER: 'player',       // Pick a player (v2)
   };
 
-  // Hardcoded question pool (v1 - free response only)
+  // Question pool with mixed types (v2)
   static QUESTIONS = [
+    // Free response questions
     { id: 'q1', type: 'free', prompt: 'If you won the lottery, what\'s the first thing you\'d buy?' },
     { id: 'q2', type: 'free', prompt: 'What superpower would you want?' },
     { id: 'q3', type: 'free', prompt: 'What actress/actor would play you in a movie?' },
-    { id: 'q4', type: 'free', prompt: 'What\'s your favorite color?' },
-    { id: 'q5', type: 'free', prompt: 'What was your favorite school subject?' },
-    { id: 'q6', type: 'free', prompt: 'What app do you spend the most time on?' },
-    { id: 'q7', type: 'free', prompt: 'What\'s your favorite holiday?' },
-    { id: 'q8', type: 'free', prompt: 'What\'s your least favorite chore at home?' },
+    { id: 'q4', type: 'free', prompt: 'What app do you spend the most time on?' },
+    // Multiple choice questions
+    {
+      id: 'q5', type: 'multiple', prompt: 'What\'s your favorite season?',
+      options: [
+        { id: 'spring', text: 'Spring' },
+        { id: 'summer', text: 'Summer' },
+        { id: 'fall', text: 'Fall' },
+        { id: 'winter', text: 'Winter' },
+      ],
+    },
+    {
+      id: 'q6', type: 'multiple', prompt: 'What time do you usually wake up?',
+      options: [
+        { id: 'early', text: 'Before 7am' },
+        { id: 'normal', text: '7am - 9am' },
+        { id: 'late', text: '9am - 11am' },
+        { id: 'noon', text: 'After 11am' },
+      ],
+    },
+    {
+      id: 'q7', type: 'multiple', prompt: 'Where would you rather go on vacation?',
+      options: [
+        { id: 'beach', text: 'Beach' },
+        { id: 'mountains', text: 'Mountains' },
+        { id: 'city', text: 'Big City' },
+        { id: 'staycation', text: 'Staycation at home' },
+      ],
+    },
+    {
+      id: 'q8', type: 'multiple', prompt: 'How do you feel about spicy food?',
+      options: [
+        { id: 'love', text: 'The spicier the better!' },
+        { id: 'medium', text: 'Medium spice is nice' },
+        { id: 'mild', text: 'Mild only please' },
+        { id: 'none', text: 'No spice at all' },
+      ],
+    },
   ];
 
   constructor(room, io) {
@@ -65,11 +99,7 @@ class AboutYouGame extends BaseGame {
     for (const player of room.players) {
       this.scores.set(player.id, 0);
     }
-
-    // Timer state
-    this.timer = null;
-    this.timerEnd = null;
-    this.timerInterval = null;
+    // Timer state inherited from BaseGame (this._timer, this._timerEnd, this._timerInterval)
   }
 
   // ============ GAME FLOW ============
@@ -129,7 +159,8 @@ class AboutYouGame extends BaseGame {
       timer: Math.ceil(duration / 1000),
     });
 
-    this.startTimer(duration, () => this.endAnsweringPhase());
+    // Use BaseGame timer utility
+    this.startTimer(duration, () => this.endAnsweringPhase(), 'ay:timer');
   }
 
   endAnsweringPhase() {
@@ -145,7 +176,6 @@ class AboutYouGame extends BaseGame {
   }
 
   startRevealPhase() {
-    const mcAnswer = this.answers.get(this.mainCharacterId);
     const matches = this.calculateMatches();
     const guesses = this.getGuessesForReveal();
 
@@ -155,7 +185,7 @@ class AboutYouGame extends BaseGame {
       totalQuestions: this.questions.length,
       mainCharacterId: this.mainCharacterId,
       mainCharacterName: this.mainCharacterName,
-      mainCharacterAnswer: mcAnswer,
+      mainCharacterAnswer: this.getMcAnswerDisplay(), // Display text for MC answer
       guesses,
       matches,
       approvedGuesses: Array.from(this.approvedGuesses),
@@ -167,17 +197,29 @@ class AboutYouGame extends BaseGame {
   calculateMatches() {
     const matches = [];
     const mcAnswer = this.answers.get(this.mainCharacterId);
-    const normalizedMcAnswer = mcAnswer?.toLowerCase().trim() || '';
+
+    // For multiple choice questions, compare option IDs directly
+    // For free response, normalize and compare text
+    const isMultipleChoice = this.currentQuestion?.type === 'multiple';
 
     for (const [playerId, answer] of this.answers) {
       // Skip MC - they don't guess
       if (playerId === this.mainCharacterId) continue;
 
-      const normalizedAnswer = answer?.toLowerCase().trim() || '';
-      const isExactMatch = normalizedAnswer === normalizedMcAnswer;
       const isApproved = this.approvedGuesses.has(playerId);
 
-      if (isExactMatch || isApproved) {
+      let isMatch = false;
+      if (isMultipleChoice) {
+        // Exact match on option ID for multiple choice
+        isMatch = answer === mcAnswer;
+      } else {
+        // Normalized text comparison for free response
+        const normalizedMcAnswer = mcAnswer?.toLowerCase().trim() || '';
+        const normalizedAnswer = answer?.toLowerCase().trim() || '';
+        isMatch = normalizedAnswer === normalizedMcAnswer;
+      }
+
+      if (isMatch || isApproved) {
         matches.push(playerId);
       }
     }
@@ -219,7 +261,8 @@ class AboutYouGame extends BaseGame {
       finalScores: scores,
     });
 
-    this.startTimer(AboutYouGame.TIMERS.gameOver, () => this.endGame());
+    // Use BaseGame timer utility
+    this.startTimer(AboutYouGame.TIMERS.gameOver, () => this.endGame(), 'ay:timer');
   }
 
   endGame() {
@@ -252,51 +295,43 @@ class AboutYouGame extends BaseGame {
     });
   }
 
-  startTimer(duration, onComplete) {
-    this.timerEnd = Date.now() + duration;
-
-    // Broadcast timer updates every second
-    this.timerInterval = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((this.timerEnd - Date.now()) / 1000));
-      this.broadcast('ay:timer', { secondsLeft: remaining });
-
-      if (remaining <= 0) {
-        this.clearTimer();
-      }
-    }, 1000);
-
-    // Set the completion timer
-    this.timer = setTimeout(() => {
-      this.clearTimer();
-      onComplete();
-    }, duration);
-  }
-
-  clearTimer() {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-      this.timerInterval = null;
-    }
-  }
+  // Timer methods inherited from BaseGame: startTimer(), clearTimer(), getTimerRemaining()
 
   getGuessesForReveal() {
     const result = [];
+    const isMultipleChoice = this.currentQuestion?.type === 'multiple';
+
     for (const [playerId, answer] of this.answers) {
       // Skip MC
       if (playerId === this.mainCharacterId) continue;
 
       const player = this.getPlayer(playerId);
+
+      // For multiple choice, convert option ID to display text
+      let displayGuess = answer;
+      if (isMultipleChoice && this.currentQuestion?.options) {
+        const option = this.currentQuestion.options.find((o) => o.id === answer);
+        displayGuess = option?.text || answer;
+      }
+
       result.push({
         playerId,
         playerName: player?.name || 'Unknown',
-        guess: answer,
+        guess: displayGuess,
+        answerId: answer, // Include raw answer for matching
       });
     }
     return result;
+  }
+
+  // Helper to get MC answer as display text
+  getMcAnswerDisplay() {
+    const mcAnswer = this.answers.get(this.mainCharacterId);
+    if (this.currentQuestion?.type === 'multiple' && this.currentQuestion?.options) {
+      const option = this.currentQuestion.options.find((o) => o.id === mcAnswer);
+      return option?.text || mcAnswer;
+    }
+    return mcAnswer;
   }
 
   getScoreboard() {
@@ -422,15 +457,13 @@ class AboutYouGame extends BaseGame {
   }
 
   broadcastRevealUpdate() {
-    const mcAnswer = this.answers.get(this.mainCharacterId);
-
     this.broadcastPhase('reveal', {
       question: this.currentQuestion,
       questionNumber: this.currentQuestionIndex + 1,
       totalQuestions: this.questions.length,
       mainCharacterId: this.mainCharacterId,
       mainCharacterName: this.mainCharacterName,
-      mainCharacterAnswer: mcAnswer,
+      mainCharacterAnswer: this.getMcAnswerDisplay(),
       guesses: this.getGuessesForReveal(),
       matches: this.calculateMatches(),
       approvedGuesses: Array.from(this.approvedGuesses),
@@ -466,7 +499,7 @@ class AboutYouGame extends BaseGame {
       question: this.currentQuestion,
       questionNumber: this.currentQuestionIndex + 1,
       totalQuestions: this.questions.length,
-      timer: this.timerEnd ? Math.max(0, Math.ceil((this.timerEnd - Date.now()) / 1000)) : null,
+      timer: this.getTimerRemaining(),
       mainCharacterAnswer: mcAnswer,
       guesses: this.getGuessesForReveal(),
       matches: this.calculateMatches(),
@@ -492,7 +525,7 @@ class AboutYouGame extends BaseGame {
       question: this.currentQuestion,
       questionNumber: this.currentQuestionIndex + 1,
       totalQuestions: this.questions.length,
-      timer: this.timerEnd ? Math.max(0, Math.ceil((this.timerEnd - Date.now()) / 1000)) : null,
+      timer: this.getTimerRemaining(),
       hasAnswered,
       myScore: this.scores.get(playerId) || 0,
       // In reveal phase, show the MC answer and if player's guess was correct

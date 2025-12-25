@@ -14,6 +14,11 @@ class BaseGame {
     this.io = io;
     this.state = 'lobby';
     this.createdAt = Date.now();
+
+    // Timer state (shared utility)
+    this._timer = null;
+    this._timerEnd = null;
+    this._timerInterval = null;
   }
 
   /**
@@ -133,6 +138,58 @@ class BaseGame {
    */
   log(message) {
     console.log(`[Game:${this.room.code}] ${message}`);
+  }
+
+  // ============ Timer Utilities ============
+
+  /**
+   * Start a countdown timer with per-second broadcasts
+   * @param {number} duration - Duration in milliseconds
+   * @param {Function} onComplete - Callback when timer expires
+   * @param {string} eventName - Socket event to broadcast (e.g., 'ay:timer', 'bg:timer')
+   */
+  startTimer(duration, onComplete, eventName = 'game:timer') {
+    this.clearTimer();
+    this._timerEnd = Date.now() + duration;
+
+    // Broadcast timer updates every second
+    this._timerInterval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((this._timerEnd - Date.now()) / 1000));
+      this.broadcast(eventName, { secondsLeft: remaining });
+
+      if (remaining <= 0) {
+        this.clearTimer();
+      }
+    }, 1000);
+
+    // Set the completion timer
+    this._timer = setTimeout(() => {
+      this.clearTimer();
+      onComplete();
+    }, duration);
+  }
+
+  /**
+   * Clear any active timer
+   */
+  clearTimer() {
+    if (this._timer) {
+      clearTimeout(this._timer);
+      this._timer = null;
+    }
+    if (this._timerInterval) {
+      clearInterval(this._timerInterval);
+      this._timerInterval = null;
+    }
+  }
+
+  /**
+   * Get remaining seconds on current timer
+   * @returns {number|null} Seconds remaining or null if no timer
+   */
+  getTimerRemaining() {
+    if (!this._timerEnd) return null;
+    return Math.max(0, Math.ceil((this._timerEnd - Date.now()) / 1000));
   }
 }
 
