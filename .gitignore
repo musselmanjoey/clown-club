@@ -25,3 +25,8 @@ npm-debug.log*
 # Build
 dist/
 build/
+
+# Reference images and task files
+data/
+RECORD-STORE.md
+nul
