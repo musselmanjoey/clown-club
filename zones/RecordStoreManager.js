@@ -118,16 +118,36 @@ class RecordStoreManager {
    */
   async handleRequestState(socket, roomCode) {
     const state = spotifyManager.getPlaybackState(roomCode);
+    const isAuth = spotifyManager.isAuthenticated(roomCode);
+
+    // Get access token for client-side search (if authenticated)
+    let accessToken = null;
+    if (isAuth) {
+      accessToken = await spotifyManager.getAccessToken(roomCode);
+    }
 
     if (state) {
-      socket.emit('rs:state-update', spotifyManager.formatPlaybackState(state));
-    } else if (spotifyManager.isAuthenticated(roomCode)) {
+      socket.emit('rs:state-update', {
+        ...spotifyManager.formatPlaybackState(state),
+        authenticated: isAuth,
+        accessToken,
+      });
+    } else if (isAuth) {
       // Fetch fresh state
       const freshState = await spotifyManager.fetchPlaybackState(roomCode);
       if (freshState) {
-        socket.emit('rs:state-update', spotifyManager.formatPlaybackState(freshState));
+        socket.emit('rs:state-update', {
+          ...spotifyManager.formatPlaybackState(freshState),
+          authenticated: true,
+          accessToken,
+        });
       } else {
-        socket.emit('rs:state-update', { isPlaying: false, track: null });
+        socket.emit('rs:state-update', {
+          isPlaying: false,
+          track: null,
+          authenticated: true,
+          accessToken,
+        });
       }
     } else {
       socket.emit('rs:state-update', {

@@ -1,12 +1,16 @@
 /**
  * SpotifyManager - Manages Spotify tokens and playback state per room
  *
- * Tokens are stored server-side, keyed by room code.
- * Only the host who authenticated can control playback.
+ * Supports two modes:
+ * 1. Per-room tokens (each room host authenticates separately)
+ * 2. Global host mode (single account used by all rooms - for party DJ setup)
+ *
+ * Use GLOBAL_HOST as roomCode for single-account mode.
  */
 
 const SPOTIFY_API_URL = 'https://api.spotify.com/v1';
 const TOKEN_REFRESH_MARGIN = 5 * 60 * 1000; // Refresh 5 minutes before expiry
+const GLOBAL_HOST = '__GLOBAL_HOST__';
 
 class SpotifyManager {
   constructor() {
@@ -16,6 +20,34 @@ class SpotifyManager {
     this.playbackStates = new Map();
     // Map of roomCode -> sync interval ID
     this.syncIntervals = new Map();
+    // Whether to use global host mode (single Spotify account for all rooms)
+    this.useGlobalHost = false;
+  }
+
+  /**
+   * Enable global host mode - all rooms share one Spotify account
+   */
+  enableGlobalHost() {
+    this.useGlobalHost = true;
+  }
+
+  /**
+   * Disable global host mode - each room has separate Spotify auth
+   */
+  disableGlobalHost() {
+    this.useGlobalHost = false;
+  }
+
+  /**
+   * Get the effective room key (global or room-specific)
+   * @param {string} roomCode - Original room code
+   * @returns {string} The key to use for token lookup
+   */
+  getEffectiveRoomKey(roomCode) {
+    if (this.useGlobalHost && this.roomTokens.has(GLOBAL_HOST)) {
+      return GLOBAL_HOST;
+    }
+    return roomCode;
   }
 
   /**
@@ -35,12 +67,40 @@ class SpotifyManager {
   }
 
   /**
+   * Store tokens for global host (single-account mode)
+   * @param {Object} tokens - Token data from OAuth
+   * @param {string} hostSocketId - Socket ID of the host who authenticated
+   */
+  setGlobalTokens(tokens, hostSocketId) {
+    this.setTokens(GLOBAL_HOST, tokens, hostSocketId);
+    this.enableGlobalHost();
+    console.log(`[Spotify] Global host tokens set`);
+  }
+
+  /**
+   * Get access token for global host
+   * @returns {Promise<string|null>}
+   */
+  async getGlobalAccessToken() {
+    return this.getAccessToken(GLOBAL_HOST);
+  }
+
+  /**
    * Check if room has valid Spotify authentication
    * @param {string} roomCode - Room code
    * @returns {boolean}
    */
   isAuthenticated(roomCode) {
-    return this.roomTokens.has(roomCode);
+    const key = this.getEffectiveRoomKey(roomCode);
+    return this.roomTokens.has(key);
+  }
+
+  /**
+   * Check if global host is authenticated
+   * @returns {boolean}
+   */
+  isGlobalAuthenticated() {
+    return this.roomTokens.has(GLOBAL_HOST);
   }
 
   /**
@@ -49,20 +109,21 @@ class SpotifyManager {
    * @returns {Promise<string|null>} Access token or null if not authenticated
    */
   async getAccessToken(roomCode) {
-    const tokens = this.roomTokens.get(roomCode);
+    const key = this.getEffectiveRoomKey(roomCode);
+    const tokens = this.roomTokens.get(key);
     if (!tokens) return null;
 
     // Check if token needs refresh
     if (Date.now() > tokens.expiresAt - TOKEN_REFRESH_MARGIN) {
       try {
-        await this.refreshTokens(roomCode);
+        await this.refreshTokens(key);
       } catch (err) {
-        console.error(`[Spotify] Failed to refresh token for room ${roomCode}:`, err);
+        console.error(`[Spotify] Failed to refresh token for room ${key}:`, err);
         return null;
       }
     }
 
-    return this.roomTokens.get(roomCode)?.accessToken || null;
+    return this.roomTokens.get(key)?.accessToken || null;
   }
 
   /**
@@ -296,4 +357,7 @@ class SpotifyManager {
   }
 }
 
-module.exports = new SpotifyManager();
+const spotifyManager = new SpotifyManager();
+
+module.exports = spotifyManager;
+module.exports.GLOBAL_HOST = GLOBAL_HOST;
