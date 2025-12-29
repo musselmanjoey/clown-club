@@ -36,14 +36,14 @@ const ZONES = {
     spawnPoint: { x: 400, y: 480 },
     bounds: { minX: 50, maxX: 750, minY: 200, maxY: 550 },
     objects: [
-      // Exit door back to lobby (matches createExitSign position)
-      { id: 'door-lobby', type: 'door', x: 92, y: 340, emoji: '', action: 'zone-change', targetZone: 'lobby', label: 'Exit', width: 60, height: 40 },
-      // Vinyl browser station (matches createVinylShelves position - large shelves)
-      { id: 'vinyl-browser', type: 'vinyl', x: 100, y: 280, emoji: '', action: 'browse-vinyl', label: 'Browse Collection', width: 200, height: 200 },
-      // DJ booth for playback controls (matches createDJBooth position)
-      { id: 'dj-booth', type: 'dj', x: 550, y: 320, emoji: '', action: 'playback-controls', label: 'DJ Booth', width: 160, height: 120 },
-      // Review board (matches createReviewBoard position)
-      { id: 'review-board', type: 'info', x: 680, y: 350, emoji: '', action: 'view-reviews', label: 'Reviews', width: 100, height: 140 },
+      // Vinyl browser station (record shelves on left)
+      { id: 'vinyl-browser', type: 'vinyl', x: 97, y: 314, emoji: '', action: 'browse-vinyl', label: 'Browse Collection', width: 120, height: 150 },
+      // Exit door back to lobby
+      { id: 'door-lobby', type: 'door', x: 241, y: 302, emoji: '', action: 'zone-change', targetZone: 'lobby', label: 'Exit', width: 80, height: 60 },
+      // DJ booth for playback controls
+      { id: 'dj-booth', type: 'dj', x: 430, y: 312, emoji: '', action: 'playback-controls', label: 'DJ Booth', width: 160, height: 120 },
+      // Review board on right wall
+      { id: 'review-board', type: 'info', x: 653, y: 217, emoji: '', action: 'view-reviews', label: 'Reviews', width: 100, height: 100 },
     ],
   },
 };
