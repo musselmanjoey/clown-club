@@ -90,6 +90,24 @@ class WorldState {
           message: obj.message || 'Coming soon!',
           label: obj.label,
         };
+      case 'browse-vinyl':
+        return {
+          success: true,
+          action: 'browse-vinyl',
+          label: obj.label,
+        };
+      case 'playback-controls':
+        return {
+          success: true,
+          action: 'playback-controls',
+          label: obj.label,
+        };
+      case 'view-reviews':
+        return {
+          success: true,
+          action: 'view-reviews',
+          label: obj.label,
+        };
       default:
         return { success: true, action: 'none' };
     }

@@ -5,6 +5,8 @@ const GameRegistry = require('./core/GameRegistry');
 const BoardGame = require('./games/board-game/BoardGame');
 const CaptionContestGame = require('./games/caption-contest/CaptionContestGame');
 const AboutYouGame = require('./games/about-you/AboutYouGame');
+const RecordStoreManager = require('./zones/RecordStoreManager');
+const db = require('./database/connection');
 
 const PORT = process.env.PORT || 3015;
 
@@ -38,6 +40,9 @@ gameRegistry.register('about-you', AboutYouGame);
 
 // Initialize room manager with game registry
 const roomManager = new RoomManager(io, gameRegistry);
+
+// Initialize record store manager
+const recordStoreManager = new RecordStoreManager(io, roomManager);
 
 // Socket connection handler
 io.on('connection', (socket) => {
@@ -73,9 +78,13 @@ io.on('connection', (socket) => {
   // ============ Game-Specific Events (bg:, cap:, ay: prefixes) ============
   // Route game events to active game instance
   socket.onAny((event, data) => {
-    // Only handle game-prefixed events
+    // Game-prefixed events
     if (event.startsWith('bg:') || event.startsWith('cap:') || event.startsWith('ay:')) {
       roomManager.handleGameEvent(socket, event, data);
+    }
+    // Record Store events
+    if (event.startsWith('rs:')) {
+      recordStoreManager.handleEvent(socket, event, data);
     }
   });
 
@@ -87,7 +96,19 @@ io.on('connection', (socket) => {
 });
 
 // Start server
-httpServer.listen(PORT, () => {
-  console.log(`Clown Club server running on port ${PORT}`);
-  console.log(`Available games: ${gameRegistry.getGameList().map(g => g.name).join(', ')}`);
-});
+async function start() {
+  // Connect to database
+  const dbConnected = await db.connect();
+  if (dbConnected) {
+    console.log('[DB] Connected to PostgreSQL');
+  } else {
+    console.warn('[DB] Running without database - vinyl collection will be empty');
+  }
+
+  httpServer.listen(PORT, () => {
+    console.log(`Clown Club server running on port ${PORT}`);
+    console.log(`Available games: ${gameRegistry.getGameList().map(g => g.name).join(', ')}`);
+  });
+}
+
+start();
