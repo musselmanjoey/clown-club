@@ -6,7 +6,11 @@ const BoardGame = require('./games/board-game/BoardGame');
 const CaptionContestGame = require('./games/caption-contest/CaptionContestGame');
 const AboutYouGame = require('./games/about-you/AboutYouGame');
 const RecordStoreManager = require('./zones/RecordStoreManager');
+const spotifyManager = require('./core/SpotifyManager');
 const db = require('./database/connection');
+
+// Load environment variables from .env file
+require('dotenv').config();
 
 const PORT = process.env.PORT || 3015;
 
@@ -95,6 +99,51 @@ io.on('connection', (socket) => {
   });
 });
 
+/**
+ * Auto-authenticate with Spotify using stored refresh token
+ */
+async function initSpotify() {
+  const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+
+  if (!refreshToken) {
+    console.log('[Spotify] No refresh token found - run "npm run spotify:setup" in joey-musselman-site');
+    return false;
+  }
+
+  try {
+    console.log('[Spotify] Auto-authenticating with stored refresh token...');
+
+    // Call Next.js API to refresh the token
+    const response = await fetch(`${clientUrl}/api/spotify/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `Token refresh failed: ${response.status}`);
+    }
+
+    const tokens = await response.json();
+
+    // Store as global host (single account for all rooms)
+    spotifyManager.setGlobalTokens({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token || refreshToken,
+      expires_at: tokens.expires_at,
+    }, 'server');
+
+    console.log('[Spotify] Auto-authenticated successfully! DJ Booth ready.');
+    return true;
+  } catch (err) {
+    console.error('[Spotify] Auto-authentication failed:', err.message);
+    console.log('[Spotify] You can still authenticate manually from the host screen');
+    return false;
+  }
+}
+
 // Start server
 async function start() {
   // Connect to database
@@ -104,6 +153,9 @@ async function start() {
   } else {
     console.warn('[DB] Running without database - vinyl collection will be empty');
   }
+
+  // Auto-authenticate with Spotify if refresh token is available
+  await initSpotify();
 
   httpServer.listen(PORT, () => {
     console.log(`Clown Club server running on port ${PORT}`);
