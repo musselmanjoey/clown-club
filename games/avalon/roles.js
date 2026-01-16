@@ -223,14 +223,15 @@ function assignRoles(playerIds, selectedRoleIds) {
  * Calculate what a player sees based on their role
  * @param {object} role - The player's role
  * @param {Map<string, object>} allRoles - All player role assignments
+ * @param {string} selfPlayerId - The player ID to exclude from results
  * @returns {string[]} Array of player IDs this player can see
  */
-function calculateVisiblePlayers(role, allRoles) {
+function calculateVisiblePlayers(role, allRoles, selfPlayerId) {
   const visible = [];
 
   for (const [playerId, playerRole] of allRoles) {
     // Skip self
-    if (playerRole.id === role.id) continue;
+    if (playerId === selfPlayerId) continue;
 
     for (const seeType of role.sees) {
       switch (seeType) {

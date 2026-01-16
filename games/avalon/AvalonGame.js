@@ -153,7 +153,7 @@ class AvalonGame extends BaseGame {
 
     // Calculate visibility for each player
     for (const [playerId, role] of this.roles) {
-      const visible = calculateVisiblePlayers(role, this.roles);
+      const visible = calculateVisiblePlayers(role, this.roles, playerId);
       this.visibleTo.set(playerId, visible);
     }
 
