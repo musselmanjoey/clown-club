@@ -5,6 +5,7 @@ const GameRegistry = require('./core/GameRegistry');
 const BoardGame = require('./games/board-game/BoardGame');
 const CaptionContestGame = require('./games/caption-contest/CaptionContestGame');
 const AboutYouGame = require('./games/about-you/AboutYouGame');
+const AvalonGame = require('./games/avalon/AvalonGame');
 const RecordStoreManager = require('./zones/RecordStoreManager');
 const spotifyManager = require('./core/SpotifyManager');
 const db = require('./database/connection');
@@ -41,6 +42,7 @@ const gameRegistry = new GameRegistry();
 gameRegistry.register('board-game', BoardGame);
 gameRegistry.register('caption-contest', CaptionContestGame);
 gameRegistry.register('about-you', AboutYouGame);
+gameRegistry.register('avalon', AvalonGame);
 
 // Initialize room manager with game registry
 const roomManager = new RoomManager(io, gameRegistry);
@@ -79,11 +81,14 @@ io.on('connection', (socket) => {
   socket.on('game:request-state', () => roomManager.sendGameState(socket));
   socket.on('game:leave', () => roomManager.leaveGame(socket));
 
+  // ============ Admin Events ============
+  socket.on('admin:reset-all', () => roomManager.adminResetAll(socket));
+
   // ============ Game-Specific Events (bg:, cap:, ay: prefixes) ============
   // Route game events to active game instance
   socket.onAny((event, data) => {
     // Game-prefixed events
-    if (event.startsWith('bg:') || event.startsWith('cap:') || event.startsWith('ay:')) {
+    if (event.startsWith('bg:') || event.startsWith('cap:') || event.startsWith('ay:') || event.startsWith('av:')) {
       roomManager.handleGameEvent(socket, event, data);
     }
     // Record Store events

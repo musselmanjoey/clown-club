@@ -488,7 +488,8 @@ class RoomManager {
     if (queue.players.find(p => p.id === socket.id)) {
       socket.emit('game:queue-joined', {
         position: queue.players.findIndex(p => p.id === socket.id) + 1,
-        totalPlayers: queue.players.length
+        totalPlayers: queue.players.length,
+        gameType: queue.gameType
       });
       return;
     }
@@ -501,7 +502,8 @@ class RoomManager {
     // Notify the player they joined
     socket.emit('game:queue-joined', {
       position: queue.players.length,
-      totalPlayers: queue.players.length
+      totalPlayers: queue.players.length,
+      gameType: queue.gameType
     });
 
     // Broadcast queue update to entire room (so host can see)
@@ -570,14 +572,34 @@ class RoomManager {
   }
 
   /**
-   * Host starts the game with queued players
+   * Host (or first player for no-host games) starts the game with queued players
    */
   startQueuedGame(socket) {
-    // Only spectators (host display) can start the game
-    const roomCode = this.spectators.get(socket.id);
+    // Check if spectator (host display) is starting
+    let roomCode = this.spectators.get(socket.id);
+    let isPlayerHost = false;
+
+    // If not a spectator, check if first player in queue (for no-host games like Avalon)
     if (!roomCode) {
-      socket.emit('game:error', { message: 'Only the host can start the game' });
-      return;
+      roomCode = this.playerRooms.get(socket.id);
+      if (!roomCode) {
+        socket.emit('game:error', { message: 'Not in a room' });
+        return;
+      }
+
+      const queue = this.gameQueues.get(roomCode);
+      if (!queue || queue.players.length === 0) {
+        socket.emit('game:error', { message: 'No players in queue' });
+        return;
+      }
+
+      // Check if this player is first in queue (they act as host for no-host games)
+      if (queue.players[0]?.id !== socket.id) {
+        socket.emit('game:error', { message: 'Only the first player can start the game' });
+        return;
+      }
+
+      isPlayerHost = true;
     }
 
     const queue = this.gameQueues.get(roomCode);
@@ -586,7 +608,7 @@ class RoomManager {
       return;
     }
 
-    console.log(`[Queue] Host starting game with ${queue.players.length} queued players`);
+    console.log(`[Queue] ${isPlayerHost ? 'Player host' : 'Spectator'} starting game with ${queue.players.length} queued players`);
 
     // Start the game with queued players
     // We need to pick a "host" player - use the first one who joined
@@ -943,6 +965,9 @@ class RoomManager {
       this.leaveGame(socket);
     }
 
+    // Handle queue disconnect - remove from any queue
+    this.leaveGameQueue(socket);
+
     // Handle room disconnect
     const roomCode = this.playerRooms.get(socket.id);
     if (!roomCode) return;
@@ -1012,6 +1037,39 @@ class RoomManager {
 
     this.playerRooms.delete(socket.id);
     this.playerZones.delete(socket.id);
+  }
+
+  /**
+   * Admin: Reset all games and queues
+   */
+  adminResetAll(socket) {
+    console.log('[Admin] Reset all triggered');
+
+    // End all game sessions
+    for (const [roomCode, session] of this.gameSessions.entries()) {
+      console.log(`[Admin] Ending game in ${roomCode}`);
+      if (session.game && typeof session.game.destroy === 'function') {
+        session.game.destroy();
+      }
+      // Notify all players in the game
+      this.io.to(roomCode).emit('game:ended', { reason: 'Admin reset' });
+    }
+    this.gameSessions.clear();
+    this.playerGames.clear();
+
+    // Clear all queues
+    for (const [roomCode, queue] of this.gameQueues.entries()) {
+      console.log(`[Admin] Clearing queue in ${roomCode} (${queue.players.length} players)`);
+      this.io.to(roomCode).emit('game:queue-update', {
+        gameType: null,
+        players: [],
+        count: 0,
+      });
+    }
+    this.gameQueues.clear();
+
+    console.log('[Admin] Reset complete');
+    socket.emit('admin:reset-complete');
   }
 }
 
