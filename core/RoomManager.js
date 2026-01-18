@@ -479,7 +479,11 @@ class RoomManager {
 
     // Get or create queue for this room
     let queue = this.gameQueues.get(roomCode);
-    if (!queue) {
+    if (!queue || (gameType && queue.gameType !== gameType)) {
+      // Create new queue if none exists or if switching to a different game type
+      if (queue && queue.gameType !== gameType) {
+        console.log(`[Queue] Switching from ${queue.gameType} to ${gameType}, clearing old queue`);
+      }
       queue = { gameType: gameType || 'board-game', players: [] };
       this.gameQueues.set(roomCode, queue);
     }
