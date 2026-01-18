@@ -189,6 +189,7 @@ class AvalonGame extends BaseGame {
           name: role.name,
           team: role.team,
           description: role.description,
+          canAssassinate: role.canAssassinate || false,
         },
         sees: visibleNames,
         seesLabel,
@@ -707,8 +708,8 @@ class AvalonGame extends BaseGame {
   // ============ STATE GETTERS ============
 
   getHostState() {
-    // Not really used since there's no separate host display
-    return this.getGenericState();
+    // In Avalon, the host is a player, so they need full player state
+    return this.getPlayerState(this.hostId);
   }
 
   getPlayerState(playerId) {
@@ -716,6 +717,7 @@ class AvalonGame extends BaseGame {
     const visible = this.visibleTo.get(playerId) || [];
     const leaderId = this.seating[this.currentLeaderIndex];
     const playerCount = this.getPlayerCount();
+    const players = this.room.players.map(p => ({ id: p.id, name: p.name }));
 
     return {
       gameType: 'avalon',
@@ -730,12 +732,13 @@ class AvalonGame extends BaseGame {
         name: role.name,
         team: role.team,
         description: role.description,
+        canAssassinate: role.canAssassinate || false,
       } : null,
       visiblePlayers: visible.map(id => {
         const player = this.getPlayer(id);
         return { id, name: player?.name || 'Unknown' };
       }),
-      players: this.room.players.map(p => ({ id: p.id, name: p.name })),
+      players,
       minPlayers: AvalonGame.minPlayers,
       canStart: playerCount >= AvalonGame.minPlayers,
       currentQuest: this.currentQuest + 1,
@@ -750,6 +753,7 @@ class AvalonGame extends BaseGame {
       consecutiveRejections: this.consecutiveRejections,
       maxRejections: MAX_REJECTIONS,
       timer: this.getTimerRemaining(),
+      selectedRoles: this.selectedRoles,
     };
   }
 
