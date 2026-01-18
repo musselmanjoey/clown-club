@@ -114,6 +114,22 @@ Server -> Client:
 - `bg:*` - Board Game events
 - `cap:*` - Caption Contest events
 - `ay:*` - About You events
+- `av:*` - Avalon events
+
+## Game Hosting Models
+
+Games can use different hosting patterns:
+
+**TV Host Games** (Board Rush, Caption Contest, About You)
+- Require a separate TV/spectator display to start
+- Host display shows game state, players use phones as controllers
+- Spectator joins via `/clown-club/host`
+
+**No-Host Games** (Avalon)
+- First player in queue acts as host
+- No separate display needed - all players use same view
+- Start button appears in queue overlay for first player
+- Client checks `gameType === 'avalon'` in `GamesRoomScene.ts`
 
 ## Adding a New Game
 
