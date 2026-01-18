@@ -501,21 +501,25 @@ class RoomManager {
     // Add player to queue
     queue.players.push({ id: socket.id, name: player.name });
 
-    console.log(`[Queue] ${player.name} joined queue in ${roomCode} (${queue.players.length} waiting)`);
+    console.log(`[Queue] ${player.name} joined ${queue.gameType} queue in ${roomCode} (${queue.players.length} waiting)`);
 
     // Notify the player they joined
-    socket.emit('game:queue-joined', {
+    const joinedData = {
       position: queue.players.length,
       totalPlayers: queue.players.length,
       gameType: queue.gameType
-    });
+    };
+    console.log(`[Queue] Emitting game:queue-joined to ${player.name}:`, joinedData);
+    socket.emit('game:queue-joined', joinedData);
 
     // Broadcast queue update to entire room (so host can see)
-    this.io.to(roomCode).emit('game:queue-update', {
+    const updateData = {
       gameType: queue.gameType,
       players: queue.players,
       count: queue.players.length,
-    });
+    };
+    console.log(`[Queue] Broadcasting game:queue-update to room ${roomCode}:`, updateData);
+    this.io.to(roomCode).emit('game:queue-update', updateData);
   }
 
   /**
