@@ -37,12 +37,12 @@ class AvalonGame extends BaseGame {
   // Timer durations (ms)
   static TIMERS = {
     night: 10000,        // Role reveal
-    teamBuilding: 90000, // Leader picks team
+    teamBuilding: 180000, // Leader picks team (3 min)
     voting: 30000,       // Vote on team
     quest: 30000,        // Submit quest cards
     questResult: 5000,   // Show result
     assassination: 60000, // Pick Merlin
-    gameOver: 10000,     // Final screen
+    gameOver: 0,         // No timer - manual exit only
   };
 
   constructor(room, io) {
@@ -452,9 +452,7 @@ class AvalonGame extends BaseGame {
       hostId: this.hostId,
     });
 
-    this.startTimer(AvalonGame.TIMERS.gameOver, () => {
-      this.endGame();
-    }, 'av:timer');
+    // No auto-timer - players manually leave via "Return to Lobby" button
   }
 
   endGame() {
